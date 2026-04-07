@@ -4,7 +4,7 @@
 export const emailAuthRedirectPath = '/onboarding/proof'
 
 const LOCAL_REDIRECT = 'http://localhost:5173/onboarding/proof'
-const PRODUCTION_REDIRECT = 'https://buzzer-liart.vercel.app/onboarding/proof'
+const PRODUCTION_REDIRECT = 'https://buzzer-gilt.vercel.app/onboarding/proof'
 
 export const emailAuthRedirectUrl = (() => {
   if (typeof window === 'undefined') {
