@@ -71,3 +71,137 @@ create policy "Users can update own proof files"
     bucket_id = 'proofs'
     and (storage.foldername(name))[1] = auth.uid()::text
   );
+
+-- Session 2: main app tables
+-- Users are scoped by their verified profile address (building-level isolation).
+
+create extension if not exists pgcrypto;
+
+create table if not exists public.packages (
+  id uuid primary key default gen_random_uuid(),
+  building_address text not null,
+  from_unit text not null,
+  held_by_unit text not null,
+  held_by_name text not null,
+  note text,
+  status text not null default 'waiting',
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.requests (
+  id uuid primary key default gen_random_uuid(),
+  building_address text not null,
+  requester_unit text not null,
+  requester_name text not null,
+  note text not null,
+  status text not null default 'open',
+  chosen_volunteer_unit text,
+  chosen_volunteer_name text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.volunteers (
+  id uuid primary key default gen_random_uuid(),
+  request_id uuid not null references public.requests (id) on delete cascade,
+  unit text not null,
+  name text not null,
+  created_at timestamptz not null default now(),
+  unique (request_id, unit)
+);
+
+create index if not exists packages_building_created_idx
+  on public.packages (building_address, created_at desc);
+create index if not exists packages_from_unit_idx
+  on public.packages (building_address, from_unit);
+
+create index if not exists requests_building_created_idx
+  on public.requests (building_address, created_at desc);
+
+create index if not exists volunteers_request_idx
+  on public.volunteers (request_id, created_at desc);
+
+alter table public.packages enable row level security;
+alter table public.requests enable row level security;
+alter table public.volunteers enable row level security;
+
+create policy "Packages visible to same building"
+  on public.packages for select
+  using (
+    building_address = (
+      select p.address from public.profiles p where p.id = auth.uid()
+    )
+  );
+
+create policy "Packages inserted in own building"
+  on public.packages for insert
+  with check (
+    building_address = (
+      select p.address from public.profiles p where p.id = auth.uid()
+    )
+  );
+
+create policy "Packages updated in own building"
+  on public.packages for update
+  using (
+    building_address = (
+      select p.address from public.profiles p where p.id = auth.uid()
+    )
+  )
+  with check (
+    building_address = (
+      select p.address from public.profiles p where p.id = auth.uid()
+    )
+  );
+
+create policy "Requests visible to same building"
+  on public.requests for select
+  using (
+    building_address = (
+      select p.address from public.profiles p where p.id = auth.uid()
+    )
+  );
+
+create policy "Requests inserted in own building"
+  on public.requests for insert
+  with check (
+    building_address = (
+      select p.address from public.profiles p where p.id = auth.uid()
+    )
+  );
+
+create policy "Requests updated in own building"
+  on public.requests for update
+  using (
+    building_address = (
+      select p.address from public.profiles p where p.id = auth.uid()
+    )
+  )
+  with check (
+    building_address = (
+      select p.address from public.profiles p where p.id = auth.uid()
+    )
+  );
+
+create policy "Volunteers visible in own building requests"
+  on public.volunteers for select
+  using (
+    exists (
+      select 1
+      from public.requests r
+      join public.profiles p on p.id = auth.uid()
+      where r.id = volunteers.request_id
+        and r.building_address = p.address
+    )
+  );
+
+create policy "Volunteers inserted in own building requests"
+  on public.volunteers for insert
+  with check (
+    exists (
+      select 1
+      from public.requests r
+      join public.profiles p on p.id = auth.uid()
+      where r.id = volunteers.request_id
+        and r.building_address = p.address
+    )
+  );
