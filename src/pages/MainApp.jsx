@@ -158,17 +158,35 @@ function FeedCard({ post, myUnit, onVolunteer, onChoose }) {
   )
 }
 
-function LogModal({ onSubmit, onCancel }) {
+function LogModal({ onSubmit, onCancel, neighbors }) {
   const [unit, setUnit] = useState('')
   const [note, setNote] = useState('')
+  const hasNeighbors = neighbors.length > 0
   return (
     <Sheet>
       <div style={{ fontSize: 11, color: '#D4773A', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>Private · Neighbor only</div>
       <h2 style={{ fontSize: 20, fontWeight: 800, margin: '0 0 4px', fontFamily: "'Barlow', sans-serif" }}>Spotted a Package?</h2>
       <p style={{ fontSize: 14, color: '#999', margin: '0 0 20px' }}>Only the recipient is notified. Nothing posts to the feed.</p>
-      <div style={{ marginBottom: 14 }}><FieldLabel>Which unit?</FieldLabel><input style={inputStyle} placeholder="e.g. 3B" value={unit} onChange={(e) => setUnit(e.target.value.toUpperCase())} maxLength={6} /></div>
+      <div style={{ marginBottom: 14 }}>
+        <FieldLabel>Which neighbor?</FieldLabel>
+        <select
+          style={inputStyle}
+          value={unit}
+          onChange={(e) => setUnit(e.target.value)}
+          disabled={!hasNeighbors}
+        >
+          <option value="">
+            {hasNeighbors ? 'Select neighbor' : 'No approved neighbors available'}
+          </option>
+          {neighbors.map((n) => (
+            <option key={n.id} value={n.unit}>
+              {`Unit ${n.unit} — ${n.name}`}
+            </option>
+          ))}
+        </select>
+      </div>
       <div style={{ marginBottom: 22 }}><FieldLabel>Note (optional)</FieldLabel><input style={inputStyle} placeholder="e.g. Holding in 4B, medium box" value={note} onChange={(e) => setNote(e.target.value)} /></div>
-      <button type="button" onClick={() => unit.trim() && onSubmit({ unit: unit.trim(), note })} disabled={!unit.trim()} style={{ width: '100%', padding: 14, background: unit.trim() ? '#D4773A' : '#e8e8e8', color: unit.trim() ? '#fff' : '#aaa', border: 'none', borderRadius: 12, fontWeight: 800, fontSize: 16, cursor: unit.trim() ? 'pointer' : 'default', fontFamily: 'inherit', marginBottom: 10 }}>Notify Neighbor Privately</button>
+      <button type="button" onClick={() => unit.trim() && onSubmit({ unit: unit.trim(), note })} disabled={!unit.trim() || !hasNeighbors} style={{ width: '100%', padding: 14, background: unit.trim() && hasNeighbors ? '#D4773A' : '#e8e8e8', color: unit.trim() && hasNeighbors ? '#fff' : '#aaa', border: 'none', borderRadius: 12, fontWeight: 800, fontSize: 16, cursor: unit.trim() && hasNeighbors ? 'pointer' : 'default', fontFamily: 'inherit', marginBottom: 10 }}>Notify Neighbor Privately</button>
       <button type="button" onClick={onCancel} style={{ width: '100%', padding: 12, background: 'transparent', color: '#999', border: 'none', borderRadius: 12, fontWeight: 600, fontSize: 15, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
     </Sheet>
   )
@@ -218,8 +236,16 @@ export default function MainApp() {
   const [profile, setProfile] = useState(null)
   const [myPkgs, setMyPkgs] = useState([])
   const [feed, setFeed] = useState([])
+  const [approvedNeighbors, setApprovedNeighbors] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [showDismissToast, setShowDismissToast] = useState(false)
+
+  useEffect(() => {
+    if (!showDismissToast) return undefined
+    const timer = window.setTimeout(() => setShowDismissToast(false), 2000)
+    return () => window.clearTimeout(timer)
+  }, [showDismissToast])
 
   useEffect(() => {
     let live = true
@@ -242,16 +268,29 @@ export default function MainApp() {
       const user = { id: p.id, name: `${p.first_name} ${p.last_name}`.trim(), unit: p.unit, building: p.address, email: p.email }
       setProfile(user)
 
-      const [{ data: pkgRows, error: pkgErr }, { data: reqRows, error: reqErr }] = await Promise.all([
+      const [{ data: pkgRows, error: pkgErr }, { data: reqRows, error: reqErr }, { data: neighborRows, error: neighborErr }] = await Promise.all([
         supabase.from('packages').select('*').eq('building_address', user.building).eq('from_unit', user.unit).order('created_at', { ascending: false }),
         supabase.from('requests').select('*').eq('building_address', user.building).order('created_at', { ascending: false }),
+        supabase
+          .from('profiles')
+          .select('id,unit,first_name,last_name,status,address')
+          .eq('address', user.building)
+          .eq('status', 'approved')
+          .neq('id', user.id),
       ])
       if (!live) return
-      if (pkgErr || reqErr) {
-        setError(pkgErr?.message || reqErr?.message || 'Could not load app data.')
+      if (pkgErr || reqErr || neighborErr) {
+        setError(pkgErr?.message || reqErr?.message || neighborErr?.message || 'Could not load app data.')
         setLoading(false)
         return
       }
+      setApprovedNeighbors(
+        (neighborRows || []).map((n) => ({
+          id: n.id,
+          unit: n.unit,
+          name: `${n.first_name || ''} ${n.last_name || ''}`.trim() || 'Neighbor',
+        })),
+      )
       const requestIds = (reqRows || []).map((r) => r.id)
       let volunteerMap = {}
       if (requestIds.length > 0) {
@@ -276,6 +315,7 @@ export default function MainApp() {
 
   async function handleDismiss(id) {
     setMyPkgs((p) => p.filter((x) => x.id !== id))
+    setShowDismissToast(true)
     const { error: uErr } = await supabase.from('packages').update({ status: 'dismissed' }).eq('id', id)
     if (uErr) setError(uErr.message)
   }
@@ -370,7 +410,32 @@ export default function MainApp() {
           </button>
         ))}
       </div>
-      {modal === 'log' && <LogModal onSubmit={handleLog} onCancel={() => setModal(null)} />}
+      {showDismissToast && (
+        <div
+          style={{
+            position: 'fixed',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            bottom: 76,
+            zIndex: 40,
+            background: '#1C1812',
+            color: '#fff',
+            borderRadius: 999,
+            padding: '8px 12px',
+            fontSize: 12,
+            fontWeight: 600,
+            letterSpacing: '0.01em',
+            opacity: 0.95,
+            boxShadow: '0 6px 18px rgba(28,24,18,0.24)',
+            transition: 'opacity 200ms ease',
+          }}
+          role="status"
+          aria-live="polite"
+        >
+          Alert dismissed
+        </div>
+      )}
+      {modal === 'log' && <LogModal neighbors={approvedNeighbors} onSubmit={handleLog} onCancel={() => setModal(null)} />}
       {modal === 'request' && <RequestModal onSubmit={handleRequest} onCancel={() => setModal(null)} />}
     </div>
   )
