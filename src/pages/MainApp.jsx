@@ -185,7 +185,7 @@ function LogModal({ onSubmit, onCancel, neighbors }) {
           ))}
         </select>
       </div>
-      <div style={{ marginBottom: 22 }}><FieldLabel>Note (optional)</FieldLabel><input style={inputStyle} placeholder="e.g. Holding in 4B, medium box" value={note} onChange={(e) => setNote(e.target.value)} /></div>
+      <div style={{ marginBottom: 22 }}><FieldLabel>Note (optional)</FieldLabel><input style={inputStyle} placeholder="e.g. Left by the mailboxes, small brown box" value={note} onChange={(e) => setNote(e.target.value)} /></div>
       <button type="button" onClick={() => unit.trim() && onSubmit({ unit: unit.trim(), note })} disabled={!unit.trim() || !hasNeighbors} style={{ width: '100%', padding: 14, background: unit.trim() && hasNeighbors ? '#D4773A' : '#e8e8e8', color: unit.trim() && hasNeighbors ? '#fff' : '#aaa', border: 'none', borderRadius: 12, fontWeight: 800, fontSize: 16, cursor: unit.trim() && hasNeighbors ? 'pointer' : 'default', fontFamily: 'inherit', marginBottom: 10 }}>Notify Neighbor Privately</button>
       <button type="button" onClick={onCancel} style={{ width: '100%', padding: 12, background: 'transparent', color: '#999', border: 'none', borderRadius: 12, fontWeight: 600, fontSize: 15, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
     </Sheet>
