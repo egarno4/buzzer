@@ -41,7 +41,7 @@ export default function Cover() {
         style={{
           position: 'relative',
           zIndex: 1,
-          padding: '56px 28px 0',
+          padding: '20px 28px 0',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
