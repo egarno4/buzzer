@@ -56,19 +56,20 @@ function EmptyState({ icon, title, sub }) {
   )
 }
 
-function MyPackagesTab({ pkgs, onCollected }) {
-  const active = pkgs.filter((p) => p.status === 'waiting')
-  const done = pkgs.filter((p) => p.status === 'collected')
-  if (pkgs.length === 0) return <EmptyState icon="📭" title="No packages right now" sub="You'll be notified privately when a neighbor spots one for you" />
+function MyPackagesTab({ pkgs, onGetHelp, onDismiss }) {
+  const visible = pkgs.filter((p) => p.status !== 'dismissed')
+  const active = visible.filter((p) => p.status === 'waiting')
+  const done = visible.filter((p) => p.status === 'collected')
+  if (visible.length === 0) return <EmptyState icon="📭" title="No packages right now" sub="You'll be notified privately when a neighbor spots one for you" />
   return (
     <div style={{ paddingBottom: 110 }}>
-      {active.length > 0 && <><SectionLabel text={`Waiting · ${active.length}`} />{active.map((p) => <MyPkgCard key={p.id} pkg={p} onCollected={onCollected} />)}</>}
-      {done.length > 0 && <><SectionLabel text={`Collected · ${done.length}`} dim />{done.map((p) => <MyPkgCard key={p.id} pkg={p} onCollected={onCollected} />)}</>}
+      {active.length > 0 && <><SectionLabel text={`Waiting · ${active.length}`} />{active.map((p) => <MyPkgCard key={p.id} pkg={p} onGetHelp={onGetHelp} onDismiss={onDismiss} />)}</>}
+      {done.length > 0 && <><SectionLabel text={`Collected · ${done.length}`} dim />{done.map((p) => <MyPkgCard key={p.id} pkg={p} onGetHelp={onGetHelp} onDismiss={onDismiss} />)}</>}
     </div>
   )
 }
 
-function MyPkgCard({ pkg, onCollected }) {
+function MyPkgCard({ pkg, onGetHelp, onDismiss }) {
   const done = pkg.status === 'collected'
   return (
     <div style={{ background: done ? '#fafafa' : '#fff', border: `1.5px solid ${done ? '#efefef' : '#D4773A'}`, borderRadius: 16, padding: 16, marginBottom: 12, opacity: done ? 0.6 : 1, boxShadow: done ? 'none' : '0 2px 14px rgba(212,119,58,0.10)' }}>
@@ -79,9 +80,18 @@ function MyPkgCard({ pkg, onCollected }) {
             <span style={{ fontWeight: 700, fontSize: 15 }}>{pkg.loggedBy}<span style={{ fontWeight: 400, color: '#999', fontSize: 13 }}> · Unit {pkg.loggerUnit}</span></span>
             <span style={{ fontSize: 12, color: '#c0c0c0' }}>{timeAgo(pkg.timestamp)}</span>
           </div>
-          <div style={{ fontSize: 14, color: '#555', marginTop: 5 }}>{done ? 'Held your package · Collected ✓' : `Holding your package in Unit ${pkg.holderUnit}`}</div>
+          <div style={{ fontSize: 14, color: '#555', marginTop: 5 }}>
+            {done
+              ? 'Neighbor spotted your package · Collected ✓'
+              : 'Your neighbor spotted a package for you'}
+          </div>
           {pkg.note && <div style={{ marginTop: 8, background: '#f4f4f4', borderRadius: 8, padding: '7px 10px', fontSize: 13, color: '#666', fontStyle: 'italic' }}>&ldquo;{pkg.note}&rdquo;</div>}
-          {!done && <button type="button" onClick={() => onCollected(pkg.id)} style={{ marginTop: 12, width: '100%', padding: 11, background: '#D4773A', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}>Mark as Collected</button>}
+          {!done && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <button type="button" onClick={() => onGetHelp(pkg)} style={{ flex: 1, padding: 11, background: '#D4773A', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}>Get Help</button>
+              <button type="button" onClick={() => onDismiss(pkg.id)} style={{ flex: 1, padding: 11, background: '#fff', color: '#1C1812', border: '1.5px solid #D4773A', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}>Dismiss</button>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -252,7 +262,7 @@ export default function MainApp() {
           return acc
         }, {})
       }
-      setMyPkgs((pkgRows || []).map((x) => ({ id: x.id, loggedBy: x.held_by_name, loggerUnit: x.held_by_unit, timestamp: x.created_at, status: x.status, note: x.note, holderUnit: x.held_by_unit })))
+      setMyPkgs((pkgRows || []).map((x) => ({ id: x.id, loggedBy: x.held_by_name, loggerUnit: x.held_by_unit, timestamp: x.created_at, status: x.status, note: x.note })))
       setFeed((reqRows || []).map((x) => ({ id: x.id, requester: x.requester_name, requesterUnit: x.requester_unit, timestamp: x.created_at, note: x.note, volunteers: volunteerMap[x.id] || [], status: x.status, chosenVolunteer: x.chosen_volunteer_name ? { name: x.chosen_volunteer_name, unit: x.chosen_volunteer_unit } : null })))
       setLoading(false)
     }
@@ -260,9 +270,13 @@ export default function MainApp() {
     return () => { live = false }
   }, [navigate])
 
-  async function handleCollected(id) {
-    setMyPkgs((p) => p.map((x) => (x.id === id ? { ...x, status: 'collected' } : x)))
-    const { error: uErr } = await supabase.from('packages').update({ status: 'collected' }).eq('id', id)
+  function handleGetHelpFromPackage() {
+    setModal('request')
+  }
+
+  async function handleDismiss(id) {
+    setMyPkgs((p) => p.filter((x) => x.id !== id))
+    const { error: uErr } = await supabase.from('packages').update({ status: 'dismissed' }).eq('id', id)
     if (uErr) setError(uErr.message)
   }
 
@@ -278,10 +292,10 @@ export default function MainApp() {
     if (recipient?.email) {
       const { error: fnErr } = await supabase.functions.invoke(NOTIFY_FUNCTION_NAME, { body: { to: recipient.email, recipientName: `${recipient.first_name || ''} ${recipient.last_name || ''}`.trim(), buildingAddress: profile.building, unit, note: note || '', heldByName: profile.name, heldByUnit: profile.unit } })
       if (fnErr) {
-        window.alert('Package logged, but notification email failed to send.')
+        window.alert('Spotted alert saved, but notification email failed to send.')
       }
     }
-    setMyPkgs((p) => [{ id: crypto.randomUUID(), loggedBy: profile.name, loggerUnit: profile.unit, timestamp: new Date().toISOString(), status: 'waiting', note, holderUnit: profile.unit }, ...p])
+    setMyPkgs((p) => [{ id: crypto.randomUUID(), loggedBy: profile.name, loggerUnit: profile.unit, timestamp: new Date().toISOString(), status: 'waiting', note }, ...p])
   }
 
   async function handleRequest({ note }) {
@@ -343,7 +357,7 @@ export default function MainApp() {
       </div>
       <div style={{ padding: '16px 16px 0' }}>
         {error ? <div style={{ color: '#b42318', marginBottom: 8, fontSize: 13 }}>{error}</div> : null}
-        {tab === 'packages' && <MyPackagesTab pkgs={myPkgs} onCollected={handleCollected} />}
+        {tab === 'packages' && <MyPackagesTab pkgs={myPkgs} onGetHelp={handleGetHelpFromPackage} onDismiss={handleDismiss} />}
         {tab === 'feed' && <FeedTab feed={feed} myUnit={profile.unit} onVolunteer={handleVolunteer} onChoose={handleChoose} />}
         {tab === 'profile' && <ProfileTab user={profile} onSignOut={async () => { await supabase.auth.signOut(); navigate('/') }} />}
       </div>
