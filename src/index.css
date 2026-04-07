@@ -276,6 +276,53 @@ textarea::placeholder {
   margin-bottom: 14px;
 }
 
+.onboarding-legal {
+  margin: 18px 0 4px;
+  padding: 14px 14px;
+  background: #fafafa;
+  border-radius: 10px;
+  border: 1.5px solid #e8e8e8;
+}
+
+.onboarding-legal-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #3d3830;
+  font-family: inherit;
+  margin: 0;
+}
+
+.onboarding-legal-checkbox {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: #d4773a;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.onboarding-legal-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.onboarding-legal-link {
+  color: #d4773a;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.onboarding-legal-link:hover {
+  color: #c06a32;
+}
+
 .ref-input,
 .ref-select {
   width: 100%;

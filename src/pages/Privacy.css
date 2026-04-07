@@ -1,0 +1,90 @@
+.privacy-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #f5f0e8;
+  display: flex;
+  flex-direction: column;
+  max-width: 430px;
+  margin: 0 auto;
+  font-family: 'Barlow', system-ui, sans-serif;
+}
+
+.privacy-header {
+  flex-shrink: 0;
+  background: #f5f0e8;
+  padding: 20px 20px 14px;
+  border-bottom: 1px solid #e8e1d5;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.privacy-header-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.privacy-wordmark {
+  font-family: 'Barlow Condensed', system-ui, sans-serif;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: #1c1812;
+}
+
+.privacy-wordmark-accent {
+  color: #d4773a;
+}
+
+.privacy-tagline {
+  font-size: 11px;
+  color: #9c8f7a;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.privacy-main {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 16px 32px;
+  box-sizing: border-box;
+}
+
+.privacy-loading,
+.privacy-fallback {
+  font-size: 15px;
+  color: #666;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.privacy-fallback a {
+  color: #d4773a;
+  font-weight: 600;
+}
+
+.privacy-policy-root {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.privacy-policy-root table {
+  max-width: 100%;
+  display: block;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.privacy-policy-root img,
+.privacy-policy-root svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.privacy-policy-root a {
+  word-break: break-word;
+}

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { OnboardingChrome } from '../components/OnboardingChrome'
 import { useOnboarding } from '../context/OnboardingContext'
 
@@ -7,13 +7,20 @@ export default function NameStep() {
   const { data, setField } = useOnboarding()
   const navigate = useNavigate()
   const [error, setError] = useState('')
+  const [legalAgreed, setLegalAgreed] = useState(false)
+
+  const fn = data.firstName.trim()
+  const ln = data.lastName.trim()
+  const canContinue = legalAgreed && Boolean(fn && ln)
 
   function handleNext(e) {
     e.preventDefault()
-    const fn = data.firstName.trim()
-    const ln = data.lastName.trim()
     if (!fn || !ln) {
       setError('Please enter your first and last name.')
+      return
+    }
+    if (!legalAgreed) {
+      setError('Please confirm you are 18 or older and accept the Terms and Privacy Policy.')
       return
     }
     setError('')
@@ -54,8 +61,40 @@ export default function NameStep() {
             onChange={(e) => setField('lastName', e.target.value)}
           />
         </div>
+        <div className="onboarding-legal">
+          <label className="onboarding-legal-label" htmlFor="legalAgree">
+            <input
+              id="legalAgree"
+              name="legalAgree"
+              type="checkbox"
+              className="onboarding-legal-checkbox"
+              checked={legalAgreed}
+              onChange={(e) => setLegalAgreed(e.target.checked)}
+            />
+            <span className="onboarding-legal-text">
+              I am 18 or older and agree to the{' '}
+              <Link
+                to="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="onboarding-legal-link"
+              >
+                Terms of Service
+              </Link>{' '}
+              and{' '}
+              <Link
+                to="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="onboarding-legal-link"
+              >
+                Privacy Policy
+              </Link>
+            </span>
+          </label>
+        </div>
         {error ? <p className="error-text">{error}</p> : null}
-        <button type="submit" className="ref-btn-submit">
+        <button type="submit" className="ref-btn-submit" disabled={!canContinue}>
           Continue
         </button>
       </form>
