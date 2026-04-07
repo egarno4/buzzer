@@ -53,11 +53,15 @@ export default function Proof() {
 
         const { data: profile } = await supabase
           .from('profiles')
-          .select('proof_file_url')
+          .select('proof_file_url,status')
           .eq('id', session.user.id)
           .maybeSingle()
 
         if (cancelled) return
+        if (profile?.status === 'approved') {
+          navigate('/app', { replace: true })
+          return
+        }
         if (profile?.proof_file_url) {
           navigate('/onboarding/pending', { replace: true })
           return
@@ -155,6 +159,17 @@ export default function Proof() {
     setLoading(false)
     if (updErr) {
       setError(updErr.message || 'Could not save proof. Try again.')
+      return
+    }
+
+    const { data: refreshedProfile } = await supabase
+      .from('profiles')
+      .select('status')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (refreshedProfile?.status === 'approved') {
+      navigate('/app', { replace: true })
       return
     }
 

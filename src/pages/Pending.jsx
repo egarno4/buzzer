@@ -14,7 +14,7 @@ export default function Pending() {
 
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
+    async function checkStatus() {
       const { data: sessionData } = await supabase.auth.getSession()
       if (cancelled) return
       if (!sessionData.session) {
@@ -24,7 +24,7 @@ export default function Pending() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('first_name, proof_file_url, email')
+        .select('first_name, proof_file_url, email, status')
         .eq('id', sessionData.session.user.id)
         .maybeSingle()
 
@@ -33,13 +33,24 @@ export default function Pending() {
         navigate('/onboarding/proof', { replace: true })
         return
       }
+      if (profile.status === 'approved') {
+        navigate('/app', { replace: true })
+        return
+      }
 
       setFirstName(profile.first_name || '')
       setEmail(profile.email || '')
       setLoading(false)
-    })()
+    }
+
+    void checkStatus()
+    const pollId = window.setInterval(() => {
+      void checkStatus()
+    }, 10000)
+
     return () => {
       cancelled = true
+      window.clearInterval(pollId)
     }
   }, [navigate])
 
