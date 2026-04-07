@@ -18,6 +18,12 @@ export default function App() {
   useEffect(() => {
     let live = true
     async function enforceProfileGate() {
+      // Onboarding: user may be verified in Auth but not have a profiles row yet (e.g. magic link → proof).
+      if (location.pathname.startsWith('/onboarding/')) {
+        if (live) setCheckedProfileGate(true)
+        return
+      }
+
       const { data: sessionData } = await supabase.auth.getSession()
       const userId = sessionData.session?.user?.id
       if (!userId) {
