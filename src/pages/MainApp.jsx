@@ -256,10 +256,14 @@ export default function MainApp() {
       navigate('/', { replace: true })
       return
     }
-    const { data: p, error: pErr } = await supabase.from('profiles').select('id,first_name,last_name,address,unit,email').eq('id', userId).single()
+    const { data: p, error: pErr } = await supabase
+      .from('profiles')
+      .select('id,first_name,last_name,address,unit,email')
+      .eq('id', userId)
+      .maybeSingle()
     if (pErr || !p) {
-      setError(pErr?.message || 'Could not load profile.')
-      setLoading(false)
+      await supabase.auth.signOut()
+      navigate('/', { replace: true })
       return
     }
     const user = { id: p.id, name: `${p.first_name} ${p.last_name}`.trim(), unit: p.unit, building: p.address, email: p.email }
