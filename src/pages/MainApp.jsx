@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
@@ -247,67 +247,98 @@ export default function MainApp() {
     return () => window.clearTimeout(timer)
   }, [showDismissToast])
 
-  useEffect(() => {
-    let live = true
-    async function loadAll() {
-      setLoading(true)
-      setError('')
-      const { data: s } = await supabase.auth.getSession()
-      const userId = s.session?.user?.id
-      if (!userId) {
-        navigate('/', { replace: true })
-        return
-      }
-      const { data: p, error: pErr } = await supabase.from('profiles').select('id,first_name,last_name,address,unit,email').eq('id', userId).single()
-      if (!live) return
-      if (pErr || !p) {
-        setError(pErr?.message || 'Could not load profile.')
-        setLoading(false)
-        return
-      }
-      const user = { id: p.id, name: `${p.first_name} ${p.last_name}`.trim(), unit: p.unit, building: p.address, email: p.email }
-      setProfile(user)
-
-      const [{ data: pkgRows, error: pkgErr }, { data: reqRows, error: reqErr }, { data: neighborRows, error: neighborErr }] = await Promise.all([
-        supabase.from('packages').select('*').eq('building_address', user.building).eq('from_unit', user.unit).order('created_at', { ascending: false }),
-        supabase.from('requests').select('*').eq('building_address', user.building).order('created_at', { ascending: false }),
-        supabase
-          .from('profiles')
-          .select('id,unit,first_name,last_name,status,address')
-          .eq('address', user.building)
-          .eq('status', 'approved')
-          .neq('id', user.id),
-      ])
-      if (!live) return
-      if (pkgErr || reqErr || neighborErr) {
-        setError(pkgErr?.message || reqErr?.message || neighborErr?.message || 'Could not load app data.')
-        setLoading(false)
-        return
-      }
-      setApprovedNeighbors(
-        (neighborRows || []).map((n) => ({
-          id: n.id,
-          unit: n.unit,
-          name: `${n.first_name || ''} ${n.last_name || ''}`.trim() || 'Neighbor',
-        })),
-      )
-      const requestIds = (reqRows || []).map((r) => r.id)
-      let volunteerMap = {}
-      if (requestIds.length > 0) {
-        const { data: volRows } = await supabase.from('volunteers').select('request_id,unit,name,created_at').in('request_id', requestIds).order('created_at', { ascending: true })
-        volunteerMap = (volRows || []).reduce((acc, v) => {
-          acc[v.request_id] = acc[v.request_id] || []
-          acc[v.request_id].push({ unit: v.unit, name: v.name })
-          return acc
-        }, {})
-      }
-      setMyPkgs((pkgRows || []).map((x) => ({ id: x.id, loggedBy: x.held_by_name, loggerUnit: x.held_by_unit, timestamp: x.created_at, status: x.status, note: x.note })))
-      setFeed((reqRows || []).map((x) => ({ id: x.id, requester: x.requester_name, requesterUnit: x.requester_unit, timestamp: x.created_at, note: x.note, volunteers: volunteerMap[x.id] || [], status: x.status, chosenVolunteer: x.chosen_volunteer_name ? { name: x.chosen_volunteer_name, unit: x.chosen_volunteer_unit } : null })))
-      setLoading(false)
+  const loadAll = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    const { data: s } = await supabase.auth.getSession()
+    const userId = s.session?.user?.id
+    if (!userId) {
+      navigate('/', { replace: true })
+      return
     }
-    loadAll()
-    return () => { live = false }
+    const { data: p, error: pErr } = await supabase.from('profiles').select('id,first_name,last_name,address,unit,email').eq('id', userId).single()
+    if (pErr || !p) {
+      setError(pErr?.message || 'Could not load profile.')
+      setLoading(false)
+      return
+    }
+    const user = { id: p.id, name: `${p.first_name} ${p.last_name}`.trim(), unit: p.unit, building: p.address, email: p.email }
+    setProfile(user)
+
+    const [{ data: pkgRows, error: pkgErr }, { data: reqRows, error: reqErr }, { data: neighborRows, error: neighborErr }] = await Promise.all([
+      supabase.from('packages').select('*').eq('building_address', user.building).eq('from_unit', user.unit).order('created_at', { ascending: false }),
+      supabase.from('requests').select('*').eq('building_address', user.building).order('created_at', { ascending: false }),
+      supabase
+        .from('profiles')
+        .select('id,unit,first_name,last_name,status,address')
+        .eq('address', user.building)
+        .eq('status', 'approved')
+        .neq('id', user.id),
+    ])
+    if (pkgErr || reqErr || neighborErr) {
+      setError(pkgErr?.message || reqErr?.message || neighborErr?.message || 'Could not load app data.')
+      setLoading(false)
+      return
+    }
+    setApprovedNeighbors(
+      (neighborRows || []).map((n) => ({
+        id: n.id,
+        unit: n.unit,
+        name: `${n.first_name || ''} ${n.last_name || ''}`.trim() || 'Neighbor',
+      })),
+    )
+    const requestIds = (reqRows || []).map((r) => r.id)
+    let volunteerMap = {}
+    if (requestIds.length > 0) {
+      const { data: volRows } = await supabase.from('volunteers').select('request_id,unit,name,created_at').in('request_id', requestIds).order('created_at', { ascending: true })
+      volunteerMap = (volRows || []).reduce((acc, v) => {
+        acc[v.request_id] = acc[v.request_id] || []
+        acc[v.request_id].push({ unit: v.unit, name: v.name })
+        return acc
+      }, {})
+    }
+    setMyPkgs((pkgRows || []).map((x) => ({ id: x.id, loggedBy: x.held_by_name, loggerUnit: x.held_by_unit, timestamp: x.created_at, status: x.status, note: x.note })))
+    setFeed((reqRows || []).map((x) => ({ id: x.id, requester: x.requester_name, requesterUnit: x.requester_unit, timestamp: x.created_at, note: x.note, volunteers: volunteerMap[x.id] || [], status: x.status, chosenVolunteer: x.chosen_volunteer_name ? { name: x.chosen_volunteer_name, unit: x.chosen_volunteer_unit } : null })))
+    setLoading(false)
   }, [navigate])
+
+  useEffect(() => {
+    void loadAll()
+  }, [loadAll])
+
+  useEffect(() => {
+    if (!profile) return undefined
+
+    const channel = supabase
+      .channel(`main-app-realtime-${profile.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'requests' },
+        () => {
+          void loadAll()
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'volunteers' },
+        () => {
+          void loadAll()
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'packages' },
+        () => {
+          void loadAll()
+        },
+      )
+      .subscribe()
+
+    return () => {
+      channel.unsubscribe()
+      supabase.removeChannel(channel)
+    }
+  }, [profile, loadAll])
 
   function handleGetHelpFromPackage() {
     setModal('request')
