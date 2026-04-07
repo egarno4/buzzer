@@ -1,4 +1,6 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { supabase } from './lib/supabase'
 import Welcome from './pages/Welcome'
 import MainApp from './pages/MainApp'
 import NameStep from './pages/NameStep'
@@ -9,6 +11,46 @@ import Proof from './pages/Proof'
 import Pending from './pages/Pending'
 
 export default function App() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [checkedProfileGate, setCheckedProfileGate] = useState(false)
+
+  useEffect(() => {
+    let live = true
+    async function enforceProfileGate() {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const userId = sessionData.session?.user?.id
+      if (!userId) {
+        if (live) setCheckedProfileGate(true)
+        return
+      }
+
+      const { data: profile, error: profileErr } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', userId)
+        .maybeSingle()
+
+      if (!live) return
+      if (profileErr || !profile) {
+        await supabase.auth.signOut()
+        if (location.pathname !== '/') {
+          navigate('/', { replace: true })
+        }
+      }
+      setCheckedProfileGate(true)
+    }
+
+    void enforceProfileGate()
+    return () => {
+      live = false
+    }
+  }, [navigate, location.pathname])
+
+  if (!checkedProfileGate) {
+    return <div className="app-shell" />
+  }
+
   return (
     <div className="app-shell">
       <Routes>
