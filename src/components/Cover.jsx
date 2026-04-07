@@ -156,11 +156,11 @@ export default function Cover() {
             <span
               role="button"
               tabIndex={0}
-              onClick={() => navigate('/app')}
+              onClick={() => navigate('/onboarding/email')}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault()
-                  navigate('/app')
+                  navigate('/onboarding/email')
                 }
               }}
               style={{ color: '#D4773A', fontWeight: 700, cursor: 'pointer' }}

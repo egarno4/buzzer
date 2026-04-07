@@ -233,6 +233,7 @@ export default function MainApp() {
   const navigate = useNavigate()
   const [tab, setTab] = useState('packages')
   const [modal, setModal] = useState(null)
+  const [sessionChecked, setSessionChecked] = useState(false)
   const [profile, setProfile] = useState(null)
   const [myPkgs, setMyPkgs] = useState([])
   const [feed, setFeed] = useState([])
@@ -246,6 +247,23 @@ export default function MainApp() {
     const timer = window.setTimeout(() => setShowDismissToast(false), 2000)
     return () => window.clearTimeout(timer)
   }, [showDismissToast])
+
+  useEffect(() => {
+    let live = true
+    async function verifySessionFirst() {
+      const { data: s } = await supabase.auth.getSession()
+      if (!live) return
+      if (!s.session?.user?.id) {
+        navigate('/', { replace: true })
+        return
+      }
+      setSessionChecked(true)
+    }
+    void verifySessionFirst()
+    return () => {
+      live = false
+    }
+  }, [navigate])
 
   const loadAll = useCallback(async () => {
     setLoading(true)
@@ -307,8 +325,9 @@ export default function MainApp() {
   }, [navigate])
 
   useEffect(() => {
+    if (!sessionChecked) return
     void loadAll()
-  }, [loadAll])
+  }, [loadAll, sessionChecked])
 
   useEffect(() => {
     if (!profile) return undefined
@@ -412,7 +431,7 @@ export default function MainApp() {
     { id: 'profile', label: 'Profile', icon: '👤', badge: 0 },
   ], [myActive, feedOpen])
 
-  if (loading) return <div style={{ padding: 24 }}>Loading…</div>
+  if (!sessionChecked || loading) return <div style={{ padding: 24 }}>Loading…</div>
   if (!profile) return <div style={{ padding: 24 }}>Profile not found.</div>
 
   return (
