@@ -1,0 +1,51 @@
+.pending-card {
+  text-align: center;
+  padding: 8px 0 16px;
+}
+
+.pending-badge {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 20px;
+  border-radius: 50%;
+  background: rgba(212, 119, 58, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pending-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #d4773a;
+  animation: pending-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes pending-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.75;
+  }
+}
+
+.pending-note {
+  font-size: 14px;
+  color: #666;
+  line-height: 1.55;
+  text-align: left;
+  margin: 0 0 24px;
+}
+
+.pending-done-btn:hover:not(:disabled) {
+  background: rgba(28, 24, 18, 0.06) !important;
+}
+
+.pending-done-btn:disabled {
+  opacity: 0.5;
+}

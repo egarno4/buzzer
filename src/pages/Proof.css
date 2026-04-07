@@ -1,0 +1,90 @@
+.proof-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.proof-card {
+  display: block;
+  position: relative;
+  padding: 16px 16px 16px 48px;
+  border: 1.5px solid #efefef;
+  border-radius: 16px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.proof-card:hover {
+  border-color: rgba(212, 119, 58, 0.35);
+}
+
+.proof-card.is-on {
+  border-color: #d4773a;
+  box-shadow: 0 2px 14px rgba(212, 119, 58, 0.1);
+}
+
+.proof-card input {
+  position: absolute;
+  left: 16px;
+  top: 18px;
+  width: 18px;
+  height: 18px;
+  accent-color: #d4773a;
+}
+
+.proof-card-title {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #1c1812;
+  margin-bottom: 4px;
+}
+
+.proof-card-desc {
+  display: block;
+  font-size: 14px;
+  color: #666;
+  line-height: 1.45;
+}
+
+.proof-file-input {
+  width: 100%;
+  padding: 10px 0;
+  font-size: 14px;
+  font-family: inherit;
+  border: none;
+  background: transparent;
+}
+
+.proof-file-name {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #999;
+}
+
+.proof-signout {
+  margin-top: 22px;
+  text-align: center;
+  font-size: 14px;
+  color: #999;
+}
+
+.proof-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #d4773a;
+  font-weight: 700;
+  font-size: inherit;
+  font-family: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.proof-link-btn:hover {
+  color: #c06a32;
+}
