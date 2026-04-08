@@ -45,6 +45,11 @@ create policy "Users can update own profile"
   using (auth.uid() = id)
   with check (auth.uid() = id);
 
+drop policy if exists "Users can delete own profile" on public.profiles;
+create policy "Users can delete own profile"
+  on public.profiles for delete
+  using (auth.uid() = id);
+
 -- Storage: create bucket "proofs" in Dashboard → Storage → New bucket
 -- Set to private (recommended). Policies below assume bucket id = proofs
 
@@ -80,6 +85,15 @@ create policy "Users can update own proof files"
     and (storage.foldername(name))[1] = auth.uid()::text
   );
 
+drop policy if exists "Users can delete own proof files" on storage.objects;
+create policy "Users can delete own proof files"
+  on storage.objects for delete
+  to authenticated
+  using (
+    bucket_id = 'proofs'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
 -- Session 2: main app tables
 -- Users are scoped by their verified profile address (building-level isolation).
 
@@ -93,6 +107,7 @@ create table if not exists public.packages (
   held_by_name text not null,
   note text,
   status text not null default 'waiting',
+  created_by uuid references auth.users (id),
   created_at timestamptz not null default now()
 );
 
@@ -105,6 +120,7 @@ create table if not exists public.requests (
   status text not null default 'open',
   chosen_volunteer_unit text,
   chosen_volunteer_name text,
+  created_by uuid references auth.users (id),
   created_at timestamptz not null default now()
 );
 
@@ -128,6 +144,11 @@ create index if not exists requests_building_created_idx
 create index if not exists volunteers_request_idx
   on public.volunteers (request_id, created_at desc);
 
+alter table public.packages
+  add column if not exists created_by uuid references auth.users (id);
+alter table public.requests
+  add column if not exists created_by uuid references auth.users (id);
+
 alter table public.packages enable row level security;
 alter table public.requests enable row level security;
 alter table public.volunteers enable row level security;
@@ -140,12 +161,14 @@ create policy "Packages visible to same building"
     )
   );
 
+drop policy if exists "Packages inserted in own building" on public.packages;
 create policy "Packages inserted in own building"
   on public.packages for insert
   with check (
     building_address = (
       select p.address from public.profiles p where p.id = auth.uid()
     )
+    and created_by = auth.uid()
   );
 
 create policy "Packages updated in own building"
@@ -161,6 +184,11 @@ create policy "Packages updated in own building"
     )
   );
 
+drop policy if exists "Users can delete own packages" on public.packages;
+create policy "Users can delete own packages"
+  on public.packages for delete
+  using (created_by = auth.uid());
+
 create policy "Requests visible to same building"
   on public.requests for select
   using (
@@ -169,12 +197,14 @@ create policy "Requests visible to same building"
     )
   );
 
+drop policy if exists "Requests inserted in own building" on public.requests;
 create policy "Requests inserted in own building"
   on public.requests for insert
   with check (
     building_address = (
       select p.address from public.profiles p where p.id = auth.uid()
     )
+    and created_by = auth.uid()
   );
 
 create policy "Requests updated in own building"
@@ -189,6 +219,11 @@ create policy "Requests updated in own building"
       select p.address from public.profiles p where p.id = auth.uid()
     )
   );
+
+drop policy if exists "Users can delete own requests" on public.requests;
+create policy "Users can delete own requests"
+  on public.requests for delete
+  using (created_by = auth.uid());
 
 create policy "Volunteers visible in own building requests"
   on public.volunteers for select

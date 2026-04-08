@@ -28,6 +28,7 @@ export default function MainApp() {
     volunteerForRequest,
     chooseVolunteer,
     updateEmailNotifications,
+    deleteAccount,
     signOut,
   } = useMainAppData(navigate)
 
@@ -99,7 +100,12 @@ export default function MainApp() {
         {tab === 'packages' && <MyPackagesTab pkgs={myPkgs} onGetHelp={handleGetHelpFromPackage} onDismiss={handleDismiss} />}
         {tab === 'feed' && <FeedTab feed={feed} myUnit={profile.unit} onVolunteer={handleVolunteer} onChoose={handleChoose} />}
         {tab === 'profile' && (
-          <ProfileTab user={profile} onSignOut={signOut} onUpdateEmailNotifications={updateEmailNotifications} />
+          <ProfileTab
+            user={profile}
+            onSignOut={signOut}
+            onUpdateEmailNotifications={updateEmailNotifications}
+            onDeleteAccount={deleteAccount}
+          />
         )}
       </div>
       <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 430, background: '#F5F0E8', borderTop: '1px solid #E8E1D5', display: 'flex', paddingBottom: 20, zIndex: 20 }}>

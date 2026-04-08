@@ -230,6 +230,32 @@ export default function useMainAppData(navigate) {
     return true
   }, [profile])
 
+  const deleteAccount = useCallback(async () => {
+    if (!profile) return { ok: false, error: 'No profile.' }
+    const userId = profile.id
+
+    const { data: proofFiles, error: listErr } = await supabase.storage.from('proofs').list(userId, { limit: 200 })
+    if (listErr) return { ok: false, error: listErr.message }
+    if (proofFiles?.length) {
+      const paths = proofFiles.map((f) => `${userId}/${f.name}`)
+      const { error: rmErr } = await supabase.storage.from('proofs').remove(paths)
+      if (rmErr) return { ok: false, error: rmErr.message }
+    }
+
+    const { error: pkgErr } = await supabase.from('packages').delete().eq('created_by', userId)
+    if (pkgErr) return { ok: false, error: pkgErr.message }
+
+    const { error: reqErr } = await supabase.from('requests').delete().eq('created_by', userId)
+    if (reqErr) return { ok: false, error: reqErr.message }
+
+    const { error: profErr } = await supabase.from('profiles').delete().eq('id', userId)
+    if (profErr) return { ok: false, error: profErr.message }
+
+    await supabase.auth.signOut()
+    navigate('/', { replace: true })
+    return { ok: true }
+  }, [profile, navigate])
+
   return {
     sessionChecked,
     profile,
@@ -245,6 +271,7 @@ export default function useMainAppData(navigate) {
     volunteerForRequest,
     chooseVolunteer,
     updateEmailNotifications,
+    deleteAccount,
     signOut: async () => {
       await supabase.auth.signOut()
       navigate('/')
