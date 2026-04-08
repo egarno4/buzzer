@@ -39,6 +39,7 @@ async function main() {
   loadEnvFile()
   const supabaseUrl = requiredEnv('VITE_SUPABASE_URL')
   const supabaseAnonKey = requiredEnv('VITE_SUPABASE_ANON_KEY')
+  const inviteSecret = requiredEnv('INVITE_SECRET')
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
@@ -72,6 +73,9 @@ async function main() {
             first_name: row.first_name,
             building_address: row.address,
           },
+        },
+        headers: {
+          'x-invite-secret': inviteSecret,
         },
       })
 

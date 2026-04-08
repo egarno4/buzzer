@@ -3,7 +3,8 @@ import { createClient } from 'jsr:@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type, x-invite-secret',
 }
 
 const FROM = 'noreply@buzzer.nyc'
@@ -31,6 +32,17 @@ function viewInBuzzerText() {
 
 function isNonEmptyString(v: unknown): v is string {
   return typeof v === 'string' && v.trim().length > 0
+}
+
+/** Constant-time comparison for invite secret (UTF-8 byte lengths must match). */
+function timingSafeEqualString(a: string, b: string): boolean {
+  const enc = new TextEncoder()
+  const ba = enc.encode(a)
+  const bb = enc.encode(b)
+  if (ba.length !== bb.length) return false
+  let diff = 0
+  for (let i = 0; i < ba.length; i++) diff |= ba[i]! ^ bb[i]!
+  return diff === 0
 }
 
 function buildEmail(
@@ -134,17 +146,30 @@ Deno.serve(async (req) => {
     })
   }
 
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader) {
-    return new Response(JSON.stringify({ ok: false, error: { message: 'Missing authorization' } }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
+  if (type === 'building_invite') {
+    const configuredSecret = Deno.env.get('INVITE_SECRET')
+    if (!configuredSecret) {
+      return new Response(
+        JSON.stringify({ ok: false, error: { message: 'INVITE_SECRET not configured' } }),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+    const headerSecret = req.headers.get('x-invite-secret') ?? ''
+    if (!timingSafeEqualString(headerSecret, configuredSecret)) {
+      return new Response(JSON.stringify({ ok: false, error: { message: 'Unauthorized' } }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+  } else {
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      return new Response(JSON.stringify({ ok: false, error: { message: 'Missing authorization' } }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
-  // Keep end-user auth required for normal app notifications.
-  // Allow anon-key invocation only for bulk building invites from trusted scripts.
-  if (type !== 'building_invite') {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
     const supabaseAnon = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     const supabase = createClient(supabaseUrl, supabaseAnon, {
