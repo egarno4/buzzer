@@ -43,12 +43,17 @@ export default function useMainAppData(navigate) {
     }
     const { data: p, error: pErr } = await supabase
       .from('profiles')
-      .select('id,first_name,last_name,address,unit,email,email_notifications')
+      .select('id,first_name,last_name,address,unit,email,email_notifications,status')
       .eq('id', userId)
       .maybeSingle()
     if (pErr || !p) {
       await supabase.auth.signOut()
       navigate('/', { replace: true })
+      return
+    }
+
+    if (p.status !== 'approved') {
+      navigate('/onboarding/pending', { replace: true })
       return
     }
 
@@ -65,7 +70,7 @@ export default function useMainAppData(navigate) {
     const [{ data: pkgRows, error: pkgErr }, { data: reqRows, error: reqErr }, { data: neighborRows, error: neighborErr }] = await Promise.all([
       supabase.from('packages').select('*').eq('building_address', user.building).eq('from_unit', user.unit).order('created_at', { ascending: false }),
       supabase.from('requests').select('*').eq('building_address', user.building).order('created_at', { ascending: false }),
-      supabase.from('profiles').select('id,unit,first_name,last_name,status,address').eq('address', user.building).eq('status', 'approved').neq('id', user.id),
+      supabase.rpc('get_building_neighbors', { p_building: user.building }),
     ])
 
     if (pkgErr || reqErr || neighborErr) {
@@ -74,7 +79,13 @@ export default function useMainAppData(navigate) {
       return
     }
 
-    setApprovedNeighbors((neighborRows || []).map((n) => ({ id: n.id, unit: n.unit, name: `${n.first_name || ''} ${n.last_name || ''}`.trim() || 'Neighbor' })))
+    setApprovedNeighbors(
+      (neighborRows || []).map((n, i) => ({
+        id: `${n.unit}|${i}`,
+        unit: n.unit,
+        name: (n.first_name || '').trim() || 'Neighbor',
+      })),
+    )
 
     const requestIds = (reqRows || []).map((r) => r.id)
     let volunteerMap = {}

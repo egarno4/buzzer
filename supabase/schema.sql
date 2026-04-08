@@ -287,3 +287,34 @@ $$;
 
 revoke all on function public.neighbor_contact_for_unit(text, text) from public;
 grant execute on function public.neighbor_contact_for_unit(text, text) to authenticated;
+
+-- Approved neighbors in the same building (unit + first name only; no emails). Caller must be approved on p_building.
+create or replace function public.get_building_neighbors(p_building text)
+returns table (unit text, first_name text)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (
+    select 1 from public.profiles me
+    where me.id = auth.uid()
+      and me.status = 'approved'
+      and me.address = p_building
+  ) then
+    return;
+  end if;
+
+  return query
+  select p.unit, p.first_name
+  from public.profiles p
+  where p.address = p_building
+    and p.status = 'approved'
+    and p.id <> auth.uid()
+  order by p.unit;
+end;
+$$;
+
+revoke all on function public.get_building_neighbors(text) from public;
+grant execute on function public.get_building_neighbors(text) to authenticated;
