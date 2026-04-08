@@ -22,54 +22,28 @@ const NYC_BOUNDS = {
 let placesScriptPromise = null
 
 function loadGooglePlacesScript() {
-  if (window.google?.maps?.places?.PlaceAutocompleteElement) {
-    return window.google.maps.importLibrary('places')
-  }
+  if (window.google?.maps?.places) return Promise.resolve(window.google)
   if (placesScriptPromise) return placesScriptPromise
 
   const key = import.meta.env.VITE_GOOGLE_PLACES_KEY
   if (!key) return Promise.reject(new Error('Missing VITE_GOOGLE_PLACES_KEY'))
 
   placesScriptPromise = new Promise((resolve, reject) => {
-    // Async loader pattern recommended by Google Maps JS API.
-    ;((g) => {
-      let h
-      let a
-      let k
-      const p = 'The Google Maps JavaScript API'
-      const c = 'google'
-      const l = 'importLibrary'
-      const q = '__ib__'
-      const m = document
-      const b = window
-      b[c] = b[c] || {}
-      const d = b[c].maps || (b[c].maps = {})
-      const r = new Set()
-      const e = new URLSearchParams()
-      const u = () =>
-        h ||
-        (h = new Promise(async (f, n) => {
-          await (a = m.createElement('script'))
-          e.set('libraries', [...r] + '')
-          for (k in g) e.set(k.replace(/[A-Z]/g, (t) => `_${t[0].toLowerCase()}`), g[k])
-          e.set('callback', `${c}.maps.${q}`)
-          a.src = `https://maps.${c}apis.com/maps/api/js?` + e
-          d[q] = f
-          a.onerror = () => n(new Error(`${p} could not load.`))
-          a.dataset.googlePlaces = 'true'
-          a.async = true
-          m.head.append(a)
-        }))
-      if (d[l]) {
-        return
-      }
-      d[l] = (f, ...n) => r.add(f) && u().then(() => d[l](f, ...n))
-    })({ key, v: 'weekly' })
+    const existing = document.querySelector('script[data-google-places="true"]')
+    if (existing) {
+      existing.addEventListener('load', () => resolve(window.google), { once: true })
+      existing.addEventListener('error', () => reject(new Error('Google Places failed to load')), { once: true })
+      return
+    }
 
-    window.google.maps
-      .importLibrary('places')
-      .then(resolve)
-      .catch(() => reject(new Error('Google Places failed to load')))
+    const script = document.createElement('script')
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=places`
+    script.async = true
+    script.defer = true
+    script.dataset.googlePlaces = 'true'
+    script.onload = () => resolve(window.google)
+    script.onerror = () => reject(new Error('Google Places failed to load'))
+    document.head.appendChild(script)
   })
 
   return placesScriptPromise
@@ -80,17 +54,15 @@ function normalizeBoroughToken(value) {
 }
 
 function boroughFromPlace(place) {
-  const components = place?.addressComponents || place?.address_components || []
+  const components = place?.address_components || []
   const byType = (type) =>
     components.find((c) => Array.isArray(c.types) && c.types.includes(type))
 
-  const componentText = (c) => c?.longText || c?.long_name || ''
-
   const possible = [
-    componentText(byType('sublocality_level_1')),
-    componentText(byType('sublocality')),
-    componentText(byType('locality')),
-    componentText(byType('administrative_area_level_2')),
+    byType('sublocality_level_1')?.long_name,
+    byType('sublocality')?.long_name,
+    byType('locality')?.long_name,
+    byType('administrative_area_level_2')?.long_name,
   ].filter(Boolean)
 
   for (const raw of possible) {
@@ -109,73 +81,46 @@ export default function AddressStep() {
   const navigate = useNavigate()
   const [error, setError] = useState('')
   const [placesError, setPlacesError] = useState('')
-  const [useFallbackInput, setUseFallbackInput] = useState(false)
-  const autocompleteHostRef = useRef(null)
+  const addressInputRef = useRef(null)
+  const autocompleteRef = useRef(null)
 
   useEffect(() => {
     let cancelled = false
-    let placeElement = null
+    let listener = null
 
     async function setupAutocomplete() {
       try {
-        const places = await loadGooglePlacesScript()
-        if (cancelled || !autocompleteHostRef.current) return
+        await loadGooglePlacesScript()
+        if (cancelled || !addressInputRef.current) return
 
-        const { PlaceAutocompleteElement } = places
-        const el = new PlaceAutocompleteElement({
-          componentRestrictions: { country: ['us'] },
-          includedRegionCodes: ['us'],
+        const bounds = new window.google.maps.LatLngBounds(
+          { lat: NYC_BOUNDS.south, lng: NYC_BOUNDS.west },
+          { lat: NYC_BOUNDS.north, lng: NYC_BOUNDS.east },
+        )
+
+        const autocomplete = new window.google.maps.places.Autocomplete(addressInputRef.current, {
           types: ['address'],
-          locationRestriction: NYC_BOUNDS,
+          componentRestrictions: { country: 'us' },
+          fields: ['formatted_address', 'address_components'],
+          bounds,
+          strictBounds: true,
         })
-        el.id = 'address'
-        el.setAttribute('aria-label', 'Street address')
-        el.setAttribute('placeholder', '123 Example St')
-        if (data.address) {
-          el.value = data.address
-        }
 
-        const onInput = () => {
-          if (typeof el.value === 'string') {
-            setField('address', el.value)
-          }
-        }
-
-        const onPlaceSelect = async (event) => {
-          const prediction =
-            event?.placePrediction ||
-            event?.detail?.placePrediction ||
-            event?.detail?.prediction ||
-            null
-          if (!prediction?.toPlace) return
-          const place = prediction.toPlace()
-          await place.fetchFields({
-            fields: ['formattedAddress', 'addressComponents'],
-          })
-          const formatted = place?.formattedAddress?.trim()
+        autocompleteRef.current = autocomplete
+        listener = autocomplete.addListener('place_changed', () => {
+          const place = autocomplete.getPlace()
+          const formatted = place?.formatted_address?.trim()
           if (formatted) {
             setField('address', formatted)
-            el.value = formatted
           }
           const borough = boroughFromPlace(place)
           if (borough) {
             setField('borough', borough)
           }
-        }
-
-        el.addEventListener('input', onInput)
-        el.addEventListener('change', onInput)
-        // Support event naming variants during API rollout.
-        el.addEventListener('gmp-select', onPlaceSelect)
-        el.addEventListener('gmp-placeselect', onPlaceSelect)
-
-        autocompleteHostRef.current.innerHTML = ''
-        autocompleteHostRef.current.appendChild(el)
-        placeElement = el
+        })
       } catch (e) {
         if (!cancelled) {
           setPlacesError('Address suggestions are unavailable right now. You can still enter your address manually.')
-          setUseFallbackInput(true)
         }
       }
     }
@@ -183,11 +128,9 @@ export default function AddressStep() {
     setupAutocomplete()
     return () => {
       cancelled = true
-      if (placeElement) {
-        placeElement.remove()
-      }
+      if (listener) window.google?.maps?.event?.removeListener(listener)
     }
-  }, [setField, data.address])
+  }, [setField])
 
   function handleNext(e) {
     e.preventDefault()
@@ -213,19 +156,16 @@ export default function AddressStep() {
           <label className="ref-field-label" htmlFor="address">
             Street address
           </label>
-          {useFallbackInput ? (
-            <input
-              id="address"
-              name="address"
-              className="ref-input"
-              autoComplete="street-address"
-              placeholder="123 Example St"
-              value={data.address}
-              onChange={(e) => setField('address', e.target.value)}
-            />
-          ) : (
-            <div ref={autocompleteHostRef} className="ref-place-host" />
-          )}
+          <input
+            id="address"
+            name="address"
+            ref={addressInputRef}
+            className="ref-input"
+            autoComplete="street-address"
+            placeholder="123 Example St"
+            value={data.address}
+            onChange={(e) => setField('address', e.target.value)}
+          />
         </div>
         {placesError ? <p className="error-text">{placesError}</p> : null}
         <div className="ref-field">
