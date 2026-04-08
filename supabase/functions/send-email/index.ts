@@ -10,8 +10,15 @@ const corsHeaders = {
 const FROM = 'noreply@buzzer.nyc'
 const APP_URL = 'https://buzzer.nyc/app'
 const HOME_URL = 'https://buzzer.nyc'
+const OPEN_BUZZER_URL = 'https://buzzer.nyc'
 
-const EMAIL_TYPES = ['package_spotted', 'volunteer_offered', 'volunteer_chosen', 'building_invite'] as const
+const EMAIL_TYPES = [
+  'package_spotted',
+  'volunteer_offered',
+  'volunteer_chosen',
+  'building_invite',
+  'account_approved',
+] as const
 type EmailType = (typeof EMAIL_TYPES)[number]
 
 function escapeHtml(s: string) {
@@ -83,6 +90,16 @@ function buildEmail(
     const text = `Hey ${fn}! ${rn} in Unit ${ru} chose you to hold their package. Please grab it when you can!\n\n${viewInBuzzerText()}`
     return { subject, html, text }
   }
+  if (type === 'account_approved') {
+    const firstName = typeof data.first_name === 'string' ? data.first_name : ''
+    const buildingAddress = typeof data.building_address === 'string' ? data.building_address : ''
+    const fn = (firstName || 'there').trim()
+    const addr = (buildingAddress || 'your building').trim()
+    const subject = "✅ You're approved on Buzzer!"
+    const html = `<p>Hey ${escapeHtml(fn)}! 🎉</p><p>You've been approved on Buzzer for ${escapeHtml(addr)}.</p><p>Your neighbors are waiting — tap below to get started:</p><p style="margin:20px 0 0"><a href="${OPEN_BUZZER_URL}" style="color:#D4773A;font-weight:700">Open Buzzer →</a></p><p style="margin:20px 0 0">No doorman required. 🙌</p><p style="margin:24px 0 0">The Buzzer Team</p>`
+    const text = `Hey ${fn}! 🎉\n\nYou've been approved on Buzzer for ${addr}.\n\nYour neighbors are waiting — tap below to get started:\n\nOpen Buzzer → (${OPEN_BUZZER_URL})\n\nNo doorman required. 🙌\nThe Buzzer Team`
+    return { subject, html, text }
+  }
   if (type === 'building_invite') {
     const firstName = typeof data.first_name === 'string' ? data.first_name : ''
     const buildingAddress = typeof data.building_address === 'string' ? data.building_address : ''
@@ -146,7 +163,7 @@ Deno.serve(async (req) => {
     })
   }
 
-  if (type === 'building_invite') {
+  if (type === 'building_invite' || type === 'account_approved') {
     const configuredSecret = Deno.env.get('INVITE_SECRET')
     if (!configuredSecret) {
       return new Response(
