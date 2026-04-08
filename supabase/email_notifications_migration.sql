@@ -4,6 +4,9 @@
 alter table public.profiles
   add column if not exists email_notifications boolean not null default true;
 
+alter table public.profiles
+  add column if not exists invite_sent boolean not null default false;
+
 -- Refresh RPC so neighbor lookups include preference (for skipping emails when off).
 create or replace function public.neighbor_contact_for_unit(p_building text, p_unit text)
 returns jsonb

@@ -63,3 +63,14 @@ export async function sendVolunteerChosenEmail({
     data: { firstName, requesterName, requesterUnit },
   })
 }
+
+/**
+ * Invite a resident when their building joins Buzzer.
+ */
+export async function sendBuildingInviteEmail({ to, firstName, buildingAddress }) {
+  return invokeSendEmail({
+    type: 'building_invite',
+    to,
+    data: { first_name: firstName, building_address: buildingAddress },
+  })
+}

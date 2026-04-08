@@ -8,8 +8,9 @@ const corsHeaders = {
 
 const FROM = 'noreply@buzzer.nyc'
 const APP_URL = 'https://buzzer.nyc/app'
+const HOME_URL = 'https://buzzer.nyc'
 
-const EMAIL_TYPES = ['package_spotted', 'volunteer_offered', 'volunteer_chosen'] as const
+const EMAIL_TYPES = ['package_spotted', 'volunteer_offered', 'volunteer_chosen', 'building_invite'] as const
 type EmailType = (typeof EMAIL_TYPES)[number]
 
 function escapeHtml(s: string) {
@@ -70,6 +71,16 @@ function buildEmail(
     const text = `Hey ${fn}! ${rn} in Unit ${ru} chose you to hold their package. Please grab it when you can!\n\n${viewInBuzzerText()}`
     return { subject, html, text }
   }
+  if (type === 'building_invite') {
+    const firstName = typeof data.first_name === 'string' ? data.first_name : ''
+    const buildingAddress = typeof data.building_address === 'string' ? data.building_address : ''
+    const fn = (firstName || 'there').trim()
+    const addr = (buildingAddress || 'your building').trim()
+    const subject = '🏠 Your building just joined Buzzer!'
+    const html = `<p>Hey ${escapeHtml(fn)}!</p><p>Your building at ${escapeHtml(addr)} has joined Buzzer — the app that helps neighbors keep each other's packages safe. No doorman required. 🙌</p><p>Your landlord has already verified your address so you're good to go. Click below to activate your account:</p><p style="margin:20px 0 0"><a href="${HOME_URL}" style="color:#D4773A;font-weight:700">Activate My Account →</a></p><p style="margin:24px 0 0">See you in the building,<br/>The Buzzer Team</p>`
+    const text = `Hey ${fn}!\n\nYour building at ${addr} has joined Buzzer - the app that helps neighbors keep each other's packages safe. No doorman required.\n\nYour landlord has already verified your address so you're good to go. Click below to activate your account:\n\nActivate My Account: ${HOME_URL}\n\nSee you in the building,\nThe Buzzer Team`
+    return { subject, html, text }
+  }
   return { error: 'invalid_type' }
 }
 
@@ -81,31 +92,6 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ ok: false, error: { message: 'Method not allowed' } }), {
       status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
-
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader) {
-    return new Response(JSON.stringify({ ok: false, error: { message: 'Missing authorization' } }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
-
-  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-  const supabaseAnon = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-  const supabase = createClient(supabaseUrl, supabaseAnon, {
-    global: { headers: { Authorization: authHeader } },
-  })
-
-  const {
-    data: { user },
-    error: userErr,
-  } = await supabase.auth.getUser()
-  if (userErr || !user) {
-    return new Response(JSON.stringify({ ok: false, error: { message: 'Unauthorized' } }), {
-      status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
@@ -146,6 +132,35 @@ Deno.serve(async (req) => {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
+  }
+
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader) {
+    return new Response(JSON.stringify({ ok: false, error: { message: 'Missing authorization' } }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
+  // Keep end-user auth required for normal app notifications.
+  // Allow anon-key invocation only for bulk building invites from trusted scripts.
+  if (type !== 'building_invite') {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+    const supabaseAnon = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    const supabase = createClient(supabaseUrl, supabaseAnon, {
+      global: { headers: { Authorization: authHeader } },
+    })
+
+    const {
+      data: { user },
+      error: userErr,
+    } = await supabase.auth.getUser()
+    if (userErr || !user) {
+      return new Response(JSON.stringify({ ok: false, error: { message: 'Unauthorized' } }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
   }
 
   const resendKey = Deno.env.get('RESEND_API_KEY')

@@ -20,7 +20,8 @@ create table if not exists public.profiles (
   proof_type text,
   proof_file_url text,
   status text not null default 'pending',
-  email_notifications boolean not null default true
+  email_notifications boolean not null default true,
+  invite_sent boolean not null default false
 );
 
 alter table public.profiles enable row level security;
@@ -28,6 +29,8 @@ alter table public.profiles enable row level security;
 -- Existing databases: add column if the table was created before this field existed.
 alter table public.profiles
   add column if not exists email_notifications boolean not null default true;
+alter table public.profiles
+  add column if not exists invite_sent boolean not null default false;
 
 create policy "Users can insert own profile"
   on public.profiles for insert

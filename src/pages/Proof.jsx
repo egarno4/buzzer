@@ -49,6 +49,11 @@ export default function Proof() {
       try {
         if (cancelled) return
         await ensureProfile(session.user, onboarding)
+        // Self-signup path: mark invite as already handled so bulk invite job skips this resident.
+        await supabase
+          .from('profiles')
+          .update({ invite_sent: true })
+          .eq('id', session.user.id)
         if (cancelled) return
 
         const { data: profile } = await supabase
