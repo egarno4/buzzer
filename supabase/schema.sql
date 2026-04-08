@@ -171,16 +171,29 @@ create policy "Packages inserted in own building"
     and created_by = auth.uid()
   );
 
-create policy "Packages updated in own building"
+drop policy if exists "Packages updated in own building" on public.packages;
+create policy "Packages updated by logger or recipient"
   on public.packages for update
   using (
     building_address = (
       select p.address from public.profiles p where p.id = auth.uid()
     )
+    and (
+      created_by = auth.uid()
+      or from_unit = (
+        select p.unit from public.profiles p where p.id = auth.uid()
+      )
+    )
   )
   with check (
     building_address = (
       select p.address from public.profiles p where p.id = auth.uid()
+    )
+    and (
+      created_by = auth.uid()
+      or from_unit = (
+        select p.unit from public.profiles p where p.id = auth.uid()
+      )
     )
   );
 
@@ -207,17 +220,20 @@ create policy "Requests inserted in own building"
     and created_by = auth.uid()
   );
 
-create policy "Requests updated in own building"
+drop policy if exists "Requests updated in own building" on public.requests;
+create policy "Requests updated by requester only"
   on public.requests for update
   using (
     building_address = (
       select p.address from public.profiles p where p.id = auth.uid()
     )
+    and created_by = auth.uid()
   )
   with check (
     building_address = (
       select p.address from public.profiles p where p.id = auth.uid()
     )
+    and created_by = auth.uid()
   );
 
 drop policy if exists "Users can delete own requests" on public.requests;
