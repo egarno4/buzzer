@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-
-const NOTIFY_FUNCTION_NAME = import.meta.env.VITE_NOTIFY_FUNCTION_NAME || 'send-package-notification'
+import {
+  sendPackageSpottedEmail,
+  sendVolunteerChosenEmail,
+  sendVolunteerOfferedEmail,
+} from '../lib/sendEmail'
 
 export default function useMainAppData(navigate) {
   const [sessionChecked, setSessionChecked] = useState(false)
@@ -109,20 +112,17 @@ export default function useMainAppData(navigate) {
       return false
     }
 
-    const { data: recipient } = await supabase.from('profiles').select('email,first_name,last_name').eq('address', profile.building).eq('unit', unit).maybeSingle()
+    const { data: recipient } = await supabase.rpc('neighbor_contact_for_unit', {
+      p_building: profile.building,
+      p_unit: unit,
+    })
     if (recipient?.email) {
-      const { error: fnErr } = await supabase.functions.invoke(NOTIFY_FUNCTION_NAME, {
-        body: {
-          to: recipient.email,
-          recipientName: `${recipient.first_name || ''} ${recipient.last_name || ''}`.trim(),
-          buildingAddress: profile.building,
-          unit,
-          note: note || '',
-          heldByName: profile.name,
-          heldByUnit: profile.unit,
-        },
+      const result = await sendPackageSpottedEmail({
+        to: recipient.email,
+        firstName: recipient.first_name,
+        buildingAddress: profile.building,
       })
-      if (fnErr) window.alert('Spotted alert saved, but notification email failed to send.')
+      if (!result.ok) window.alert('Spotted alert saved, but notification email failed to send.')
     }
 
     setMyPkgs((p) => [{ id: crypto.randomUUID(), loggedBy: profile.name, loggerUnit: profile.unit, timestamp: new Date().toISOString(), status: 'waiting', note }, ...p])
@@ -155,6 +155,26 @@ export default function useMainAppData(navigate) {
       return
     }
     setFeed((p) => p.map((x) => (x.id === id ? { ...x, volunteers: [...x.volunteers, { name: profile.name, unit: profile.unit }] } : x)))
+
+    const { data: req } = await supabase
+      .from('requests')
+      .select('building_address, requester_unit')
+      .eq('id', id)
+      .maybeSingle()
+    if (!req) return
+    const { data: requester } = await supabase.rpc('neighbor_contact_for_unit', {
+      p_building: req.building_address,
+      p_unit: req.requester_unit,
+    })
+    if (requester?.email) {
+      const result = await sendVolunteerOfferedEmail({
+        to: requester.email,
+        firstName: requester.first_name,
+        volunteerName: profile.name,
+        volunteerUnit: profile.unit,
+      })
+      if (!result.ok) window.alert('Volunteer saved, but notification email failed to send.')
+    }
   }, [profile])
 
   const chooseVolunteer = useCallback(async (id, v) => {
@@ -168,6 +188,25 @@ export default function useMainAppData(navigate) {
       return
     }
     setFeed((p) => p.map((x) => (x.id === id ? { ...x, status: 'claimed', chosenVolunteer: v } : x)))
+
+    const { data: req } = await supabase
+      .from('requests')
+      .select('building_address, requester_name, requester_unit')
+      .eq('id', id)
+      .maybeSingle()
+    if (!req) return
+    const { data: volunteer } = await supabase.rpc('neighbor_contact_for_unit', {
+      p_building: req.building_address,
+      p_unit: v.unit,
+    })
+    if (!volunteer?.email) return
+    const result = await sendVolunteerChosenEmail({
+      to: volunteer.email,
+      firstName: volunteer.first_name,
+      requesterName: req.requester_name,
+      requesterUnit: req.requester_unit,
+    })
+    if (!result.ok) window.alert('Volunteer chosen, but notification email failed to send.')
   }, [])
 
   return {
