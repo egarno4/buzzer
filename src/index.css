@@ -387,3 +387,37 @@ textarea::placeholder {
   opacity: 0.5;
   cursor: default;
 }
+
+/* Google Places dropdown branding */
+.pac-container {
+  margin-top: 6px;
+  border: 1.5px solid #e8e1d5;
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgba(28, 24, 18, 0.12);
+  background: #f5f0e8;
+  font-family: 'Barlow', system-ui, sans-serif;
+  overflow: hidden;
+}
+
+.pac-item {
+  padding: 10px 12px;
+  border-top: 1px solid #ece3d6;
+  font-family: 'Barlow', system-ui, sans-serif;
+  color: #1c1812;
+  background: #f5f0e8;
+}
+
+.pac-item:first-child {
+  border-top: none;
+}
+
+.pac-item:hover,
+.pac-item-selected {
+  background: #efe5d7;
+}
+
+.pac-item-query {
+  color: #1c1812;
+  font-size: 14px;
+  font-weight: 600;
+}
