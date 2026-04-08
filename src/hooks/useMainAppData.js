@@ -43,7 +43,7 @@ export default function useMainAppData(navigate) {
     }
     const { data: p, error: pErr } = await supabase
       .from('profiles')
-      .select('id,first_name,last_name,address,unit,email')
+      .select('id,first_name,last_name,address,unit,email,email_notifications')
       .eq('id', userId)
       .maybeSingle()
     if (pErr || !p) {
@@ -52,7 +52,14 @@ export default function useMainAppData(navigate) {
       return
     }
 
-    const user = { id: p.id, name: `${p.first_name} ${p.last_name}`.trim(), unit: p.unit, building: p.address, email: p.email }
+    const user = {
+      id: p.id,
+      name: `${p.first_name} ${p.last_name}`.trim(),
+      unit: p.unit,
+      building: p.address,
+      email: p.email,
+      emailNotifications: p.email_notifications !== false,
+    }
     setProfile(user)
 
     const [{ data: pkgRows, error: pkgErr }, { data: reqRows, error: reqErr }, { data: neighborRows, error: neighborErr }] = await Promise.all([
@@ -116,7 +123,7 @@ export default function useMainAppData(navigate) {
       p_building: profile.building,
       p_unit: unit,
     })
-    if (recipient?.email) {
+    if (recipient?.email && recipient.email_notifications !== false) {
       const result = await sendPackageSpottedEmail({
         to: recipient.email,
         firstName: recipient.first_name,
@@ -166,7 +173,7 @@ export default function useMainAppData(navigate) {
       p_building: req.building_address,
       p_unit: req.requester_unit,
     })
-    if (requester?.email) {
+    if (requester?.email && requester.email_notifications !== false) {
       const result = await sendVolunteerOfferedEmail({
         to: requester.email,
         firstName: requester.first_name,
@@ -199,7 +206,7 @@ export default function useMainAppData(navigate) {
       p_building: req.building_address,
       p_unit: v.unit,
     })
-    if (!volunteer?.email) return
+    if (!volunteer?.email || volunteer.email_notifications === false) return
     const result = await sendVolunteerChosenEmail({
       to: volunteer.email,
       firstName: volunteer.first_name,
@@ -208,6 +215,20 @@ export default function useMainAppData(navigate) {
     })
     if (!result.ok) window.alert('Volunteer chosen, but notification email failed to send.')
   }, [])
+
+  const updateEmailNotifications = useCallback(async (enabled) => {
+    if (!profile) return false
+    const { error: uErr } = await supabase
+      .from('profiles')
+      .update({ email_notifications: enabled })
+      .eq('id', profile.id)
+    if (uErr) {
+      setError(uErr.message)
+      return false
+    }
+    setProfile((prev) => (prev ? { ...prev, emailNotifications: enabled } : null))
+    return true
+  }, [profile])
 
   return {
     sessionChecked,
@@ -223,6 +244,7 @@ export default function useMainAppData(navigate) {
     createRequest,
     volunteerForRequest,
     chooseVolunteer,
+    updateEmailNotifications,
     signOut: async () => {
       await supabase.auth.signOut()
       navigate('/')

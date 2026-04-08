@@ -27,6 +27,7 @@ export default function MainApp() {
     createRequest,
     volunteerForRequest,
     chooseVolunteer,
+    updateEmailNotifications,
     signOut,
   } = useMainAppData(navigate)
 
@@ -97,7 +98,9 @@ export default function MainApp() {
         {error ? <div style={{ color: '#b42318', marginBottom: 8, fontSize: 13 }}>{error}</div> : null}
         {tab === 'packages' && <MyPackagesTab pkgs={myPkgs} onGetHelp={handleGetHelpFromPackage} onDismiss={handleDismiss} />}
         {tab === 'feed' && <FeedTab feed={feed} myUnit={profile.unit} onVolunteer={handleVolunteer} onChoose={handleChoose} />}
-        {tab === 'profile' && <ProfileTab user={profile} onSignOut={signOut} />}
+        {tab === 'profile' && (
+          <ProfileTab user={profile} onSignOut={signOut} onUpdateEmailNotifications={updateEmailNotifications} />
+        )}
       </div>
       <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 430, background: '#F5F0E8', borderTop: '1px solid #E8E1D5', display: 'flex', paddingBottom: 20, zIndex: 20 }}>
         {tabs.map((t) => (
