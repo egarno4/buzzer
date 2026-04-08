@@ -336,6 +336,14 @@ textarea::placeholder {
   color: #111;
 }
 
+.ref-place-host {
+  width: 100%;
+}
+
+.ref-place-host gmp-place-autocomplete {
+  width: 100%;
+}
+
 .ref-input:focus,
 .ref-select:focus {
   border-color: #d4773a;
