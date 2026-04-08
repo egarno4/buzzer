@@ -253,7 +253,8 @@ create policy "Volunteers visible in own building requests"
     )
   );
 
-create policy "Volunteers inserted in own building requests"
+drop policy if exists "Volunteers inserted in own building requests" on public.volunteers;
+create policy "Volunteers inserted as self in own building requests"
   on public.volunteers for insert
   with check (
     exists (
@@ -262,6 +263,13 @@ create policy "Volunteers inserted in own building requests"
       join public.profiles p on p.id = auth.uid()
       where r.id = volunteers.request_id
         and r.building_address = p.address
+    )
+    and (trim(both from unit), trim(both from name)) = (
+      select
+        trim(both from pu.unit),
+        trim(both from concat(pu.first_name, ' ', pu.last_name))
+      from public.profiles pu
+      where pu.id = auth.uid()
     )
   );
 

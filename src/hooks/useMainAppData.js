@@ -167,12 +167,15 @@ export default function useMainAppData(navigate) {
 
   const volunteerForRequest = useCallback(async (id) => {
     if (!profile) return
-    const { error: insErr } = await supabase.from('volunteers').insert({ request_id: id, unit: profile.unit, name: profile.name })
+    // Must match profiles row exactly (RLS: unit + trim(first || ' ' || last)).
+    const unit = String(profile.unit).trim()
+    const name = String(profile.name).trim()
+    const { error: insErr } = await supabase.from('volunteers').insert({ request_id: id, unit, name })
     if (insErr) {
       if (!String(insErr.message).includes('duplicate')) setError(insErr.message)
       return
     }
-    setFeed((p) => p.map((x) => (x.id === id ? { ...x, volunteers: [...x.volunteers, { name: profile.name, unit: profile.unit }] } : x)))
+    setFeed((p) => p.map((x) => (x.id === id ? { ...x, volunteers: [...x.volunteers, { name, unit }] } : x)))
 
     const { data: req } = await supabase
       .from('requests')
@@ -188,8 +191,8 @@ export default function useMainAppData(navigate) {
       const result = await sendVolunteerOfferedEmail({
         to: requester.email,
         firstName: requester.first_name,
-        volunteerName: profile.name,
-        volunteerUnit: profile.unit,
+        volunteerName: name,
+        volunteerUnit: unit,
       })
       if (!result.ok) window.alert('Volunteer saved, but notification email failed to send.')
     }
