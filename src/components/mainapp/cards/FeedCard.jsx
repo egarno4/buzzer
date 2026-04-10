@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Avatar, timeAgo } from '../shared'
 
-export default function FeedCard({ post, myUnit, onVolunteer, onChoose }) {
+export default function FeedCard({ post, myUnit, onVolunteer, onChoose, onMarkCollected }) {
   const isMine = post.requesterUnit === myUnit
   const claimed = post.status === 'claimed'
   const hasVol = post.volunteers.some((v) => v.unit === myUnit)
@@ -19,6 +19,26 @@ export default function FeedCard({ post, myUnit, onVolunteer, onChoose }) {
           </div>
           {post.note && <div style={{ fontSize: 14, color: '#444', marginTop: 6, lineHeight: 1.45 }}>{post.note}</div>}
           {claimed && post.chosenVolunteer && <div style={{ marginTop: 10, background: '#fef3ec', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: '#D4773A', fontWeight: 600 }}>✓ {post.chosenVolunteer.name} (Unit {post.chosenVolunteer.unit}) is holding it</div>}
+          {isMine && claimed && post.chosenVolunteer && onMarkCollected ? (
+            <button
+              type="button"
+              onClick={() => onMarkCollected(post.id)}
+              style={{
+                marginTop: 10,
+                padding: '6px 12px',
+                fontSize: 12,
+                fontWeight: 700,
+                color: '#D4773A',
+                background: 'transparent',
+                border: '1.5px solid #D4773A',
+                borderRadius: 8,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              Mark as Collected
+            </button>
+          ) : null}
           {isMine && !claimed && (
             <div style={{ marginTop: 10 }}>
               {post.volunteers.length === 0 ? <div style={{ fontSize: 13, color: '#bbb', fontStyle: 'italic' }}>Waiting for volunteers…</div> : <>

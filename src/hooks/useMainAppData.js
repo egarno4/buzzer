@@ -75,7 +75,12 @@ export default function useMainAppData(navigate) {
         .eq('building_address', user.building)
         .eq('from_unit', myUnit)
         .order('created_at', { ascending: false }),
-      supabase.from('requests').select('*').eq('building_address', user.building).order('created_at', { ascending: false }),
+      supabase
+        .from('requests')
+        .select('*')
+        .eq('building_address', user.building)
+        .neq('status', 'collected')
+        .order('created_at', { ascending: false }),
       supabase.rpc('get_building_neighbors', { p_building: user.building }),
     ])
 
@@ -247,6 +252,15 @@ export default function useMainAppData(navigate) {
     if (!result.ok) window.alert('Volunteer chosen, but notification email failed to send.')
   }, [])
 
+  const markRequestCollected = useCallback(async (id) => {
+    const { error: upErr } = await supabase.from('requests').update({ status: 'collected' }).eq('id', id)
+    if (upErr) {
+      setError(upErr.message)
+      return
+    }
+    setFeed((p) => p.filter((x) => x.id !== id))
+  }, [])
+
   const updateEmailNotifications = useCallback(async (enabled) => {
     if (!profile) return false
     const { error: uErr } = await supabase
@@ -301,6 +315,7 @@ export default function useMainAppData(navigate) {
     createRequest,
     volunteerForRequest,
     chooseVolunteer,
+    markRequestCollected,
     updateEmailNotifications,
     deleteAccount,
     signOut: async () => {

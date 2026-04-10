@@ -27,6 +27,7 @@ export default function MainApp() {
     createRequest,
     volunteerForRequest,
     chooseVolunteer,
+    markRequestCollected,
     updateEmailNotifications,
     deleteAccount,
     signOut,
@@ -69,6 +70,10 @@ export default function MainApp() {
     await chooseVolunteer(id, v)
   }
 
+  async function handleMarkCollected(id) {
+    await markRequestCollected(id)
+  }
+
   const myActive = myPkgs.filter((p) => p.status === 'waiting').length
   const feedOpen = feed.filter((p) => p.status === 'open').length
   const tabs = useMemo(() => [
@@ -98,7 +103,15 @@ export default function MainApp() {
       <div style={{ padding: '16px 16px 0' }}>
         {error ? <div style={{ color: '#b42318', marginBottom: 8, fontSize: 13 }}>{error}</div> : null}
         {tab === 'packages' && <MyPackagesTab pkgs={myPkgs} onGetHelp={handleGetHelpFromPackage} onDismiss={handleDismiss} />}
-        {tab === 'feed' && <FeedTab feed={feed} myUnit={profile.unit} onVolunteer={handleVolunteer} onChoose={handleChoose} />}
+        {tab === 'feed' && (
+          <FeedTab
+            feed={feed}
+            myUnit={profile.unit}
+            onVolunteer={handleVolunteer}
+            onChoose={handleChoose}
+            onMarkCollected={handleMarkCollected}
+          />
+        )}
         {tab === 'profile' && (
           <ProfileTab
             user={profile}

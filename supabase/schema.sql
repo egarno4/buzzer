@@ -141,6 +141,12 @@ create index if not exists packages_from_unit_idx
 create index if not exists requests_building_created_idx
   on public.requests (building_address, created_at desc);
 
+alter table public.requests
+  drop constraint if exists requests_status_check;
+alter table public.requests
+  add constraint requests_status_check
+  check (status in ('open', 'claimed', 'collected'));
+
 create index if not exists volunteers_request_idx
   on public.volunteers (request_id, created_at desc);
 
