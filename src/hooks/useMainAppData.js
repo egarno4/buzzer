@@ -67,8 +67,14 @@ export default function useMainAppData(navigate) {
     }
     setProfile(user)
 
+    const myUnit = String(user.unit).trim()
     const [{ data: pkgRows, error: pkgErr }, { data: reqRows, error: reqErr }, { data: neighborRows, error: neighborErr }] = await Promise.all([
-      supabase.from('packages').select('*').eq('building_address', user.building).eq('from_unit', user.unit).order('created_at', { ascending: false }),
+      supabase
+        .from('packages')
+        .select('*')
+        .eq('building_address', user.building)
+        .eq('from_unit', myUnit)
+        .order('created_at', { ascending: false }),
       supabase.from('requests').select('*').eq('building_address', user.building).order('created_at', { ascending: false }),
       supabase.rpc('get_building_neighbors', { p_building: user.building }),
     ])
@@ -98,7 +104,18 @@ export default function useMainAppData(navigate) {
       }, {})
     }
 
-    setMyPkgs((pkgRows || []).map((x) => ({ id: x.id, loggedBy: x.held_by_name, loggerUnit: x.held_by_unit, timestamp: x.created_at, status: x.status, note: x.note })))
+    // My Packages = recipient only (this building + my unit). Never show rows I logged as spotter.
+    const recipientOnly = (pkgRows || []).filter((row) => row.created_by !== user.id)
+    setMyPkgs(
+      recipientOnly.map((x) => ({
+        id: x.id,
+        loggedBy: x.held_by_name,
+        loggerUnit: x.held_by_unit,
+        timestamp: x.created_at,
+        status: x.status,
+        note: x.note,
+      })),
+    )
     setFeed((reqRows || []).map((x) => ({ id: x.id, requester: x.requester_name, requesterUnit: x.requester_unit, timestamp: x.created_at, note: x.note, volunteers: volunteerMap[x.id] || [], status: x.status, chosenVolunteer: x.chosen_volunteer_name ? { name: x.chosen_volunteer_name, unit: x.chosen_volunteer_unit } : null })))
     setLoading(false)
   }, [navigate])
@@ -143,7 +160,7 @@ export default function useMainAppData(navigate) {
       if (!result.ok) window.alert('Spotted alert saved, but notification email failed to send.')
     }
 
-    setMyPkgs((p) => [{ id: crypto.randomUUID(), loggedBy: profile.name, loggerUnit: profile.unit, timestamp: new Date().toISOString(), status: 'waiting', note }, ...p])
+    // Do not add to myPkgs here — spotter is not the recipient; recipient sees it after loadAll/realtime.
     return true
   }, [profile])
 
