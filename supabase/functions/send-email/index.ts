@@ -164,23 +164,31 @@ Deno.serve(async (req) => {
   }
 
   if (type === 'building_invite' || type === 'account_approved') {
-    const configuredSecret = Deno.env.get('INVITE_SECRET')
-    if (!configuredSecret) {
+    const envSecret = Deno.env.get('INVITE_SECRET') ?? ''
+    const receivedSecret = req.headers.get('x-invite-secret') ?? ''
+    console.log('Secret check - env secret length:', Deno.env.get('INVITE_SECRET')?.length ?? 'MISSING')
+    console.log('Secret check - header length:', receivedSecret?.length ?? 'MISSING')
+    console.log('Secret check - match:', timingSafeEqualString(receivedSecret, envSecret))
+    if (!envSecret) {
       return new Response(
         JSON.stringify({ ok: false, error: { message: 'INVITE_SECRET not configured' } }),
         { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       )
     }
-    const headerSecret = req.headers.get('x-invite-secret') ?? ''
-    if (!timingSafeEqualString(headerSecret, configuredSecret)) {
+    if (!timingSafeEqualString(receivedSecret, envSecret)) {
       return new Response(JSON.stringify({ ok: false, error: { message: 'Unauthorized' } }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
   } else {
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
+    const authHeader = req.headers.get('Authorization')?.trim() ?? ''
+    const accessToken = authHeader.replace(/^Bearer\s+/i, '').trim()
+    const jwtPresent = accessToken.length > 0
+    console.log('Auth check - Authorization header present:', authHeader.length > 0)
+    console.log('Auth check - JWT present (parsed token length):', jwtPresent ? accessToken.length : 'MISSING')
+
+    if (!jwtPresent) {
       return new Response(JSON.stringify({ ok: false, error: { message: 'Missing authorization' } }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -190,13 +198,18 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
     const supabaseAnon = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     const supabase = createClient(supabaseUrl, supabaseAnon, {
-      global: { headers: { Authorization: authHeader } },
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
     })
 
+    // Pass the access token explicitly — reliable in Edge; getUser() with no args can miss session state here.
     const {
       data: { user },
       error: userErr,
-    } = await supabase.auth.getUser()
+    } = await supabase.auth.getUser(accessToken)
+    console.log('Auth check - getUser() ok:', Boolean(user && !userErr))
+    if (userErr) {
+      console.log('Auth check - getUser() error:', userErr.message)
+    }
     if (userErr || !user) {
       return new Response(JSON.stringify({ ok: false, error: { message: 'Unauthorized' } }), {
         status: 401,

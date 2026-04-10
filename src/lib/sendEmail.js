@@ -5,8 +5,17 @@ import { supabase } from './supabase'
  */
 
 async function invokeSendEmail({ type, to, data }) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  const headers = {}
+  if (session?.access_token) {
+    headers.Authorization = `Bearer ${session.access_token}`
+  }
+
   const { data: res, error } = await supabase.functions.invoke('send-email', {
     body: { type, to, data },
+    headers,
   })
 
   if (res && typeof res === 'object') {

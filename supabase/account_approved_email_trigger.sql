@@ -1,7 +1,7 @@
 -- Account approved → send-email Edge Function (type: account_approved)
 --
 -- Prerequisites:
--- 1) Dashboard → Database → Extensions: enable "pg_net".
+-- 1) Dashboard → Database → Extensions: enable "pg_net" (this file runs create extension if not exists).
 -- 2) Deploy send-email with INVITE_SECRET (same value you put in invite_secret below).
 -- 3) Edit the constants in notify_send_account_approved_email() OR load them from Vault
 --    (recommended for production — do not commit real keys).
@@ -38,15 +38,16 @@ begin
       )
     );
 
+    -- pg_net: net.http_post(url text, body jsonb, headers jsonb)
     perform net.http_post(
       url := edge_url,
+      body := payload,
       headers := jsonb_build_object(
         'Content-Type', 'application/json',
         'Authorization', 'Bearer ' || anon_key,
         'apikey', anon_key,
         'x-invite-secret', invite_secret
-      ),
-      body := payload::text
+      )
     );
   end if;
 
