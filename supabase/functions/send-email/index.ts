@@ -1,10 +1,9 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
-import { createClient } from 'jsr:@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type, x-invite-secret',
+    'authorization, x-client-info, apikey, content-type, x-invite-secret, x-access-token',
 }
 
 const FROM = 'noreply@buzzer.nyc'
@@ -50,6 +49,38 @@ function timingSafeEqualString(a: string, b: string): boolean {
   let diff = 0
   for (let i = 0; i < ba.length; i++) diff |= ba[i]! ^ bb[i]!
   return diff === 0
+}
+
+/** Bearer from Authorization / authorization / x-access-token (fallback if proxies alter headers). */
+function getAccessTokenFromRequest(req: Request): string {
+  const raw =
+    req.headers.get('Authorization') ??
+    req.headers.get('authorization') ??
+    req.headers.get('x-access-token') ??
+    ''
+  return raw.replace(/^Bearer\s+/i, '').trim()
+}
+
+/** Validate JWT against GoTrue (more reliable in Edge than supabase-js getUser in some runtimes). */
+async function verifyUserWithGoTrue(
+  supabaseUrl: string,
+  anonKey: string,
+  accessToken: string,
+): Promise<{ ok: true; userId: string } | { ok: false; detail: string }> {
+  const base = supabaseUrl.replace(/\/$/, '')
+  const res = await fetch(`${base}/auth/v1/user`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      apikey: anonKey,
+    },
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    return { ok: false, detail: `auth/v1/user ${res.status}: ${text.slice(0, 160)}` }
+  }
+  const body = (await res.json()) as { id?: string }
+  if (!body?.id) return { ok: false, detail: 'auth/v1/user: missing id' }
+  return { ok: true, userId: body.id }
 }
 
 function buildEmail(
@@ -182,11 +213,17 @@ Deno.serve(async (req) => {
       })
     }
   } else {
-    const authHeader = req.headers.get('Authorization')?.trim() ?? ''
-    const accessToken = authHeader.replace(/^Bearer\s+/i, '').trim()
+    const accessToken = getAccessTokenFromRequest(req)
     const jwtPresent = accessToken.length > 0
-    console.log('Auth check - Authorization header present:', authHeader.length > 0)
-    console.log('Auth check - JWT present (parsed token length):', jwtPresent ? accessToken.length : 'MISSING')
+    const hasAuthHeader =
+      Boolean(req.headers.get('Authorization')?.trim()) ||
+      Boolean(req.headers.get('authorization')?.trim())
+    const hasAccessTokenHeader = Boolean(req.headers.get('x-access-token')?.trim())
+    console.log('Auth check - JWT present (token length):', jwtPresent ? accessToken.length : 'MISSING')
+    console.log('Auth check - header sources:', {
+      authorization: hasAuthHeader,
+      x_access_token: hasAccessTokenHeader,
+    })
 
     if (!jwtPresent) {
       return new Response(JSON.stringify({ ok: false, error: { message: 'Missing authorization' } }), {
@@ -197,20 +234,20 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
     const supabaseAnon = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-    const supabase = createClient(supabaseUrl, supabaseAnon, {
-      global: { headers: { Authorization: `Bearer ${accessToken}` } },
-    })
-
-    // Pass the access token explicitly — reliable in Edge; getUser() with no args can miss session state here.
-    const {
-      data: { user },
-      error: userErr,
-    } = await supabase.auth.getUser(accessToken)
-    console.log('Auth check - getUser() ok:', Boolean(user && !userErr))
-    if (userErr) {
-      console.log('Auth check - getUser() error:', userErr.message)
+    if (!supabaseUrl || !supabaseAnon) {
+      console.log('Auth check - missing SUPABASE_URL or SUPABASE_ANON_KEY in function env')
+      return new Response(JSON.stringify({ ok: false, error: { message: 'Server misconfigured' } }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
-    if (userErr || !user) {
+
+    const verified = await verifyUserWithGoTrue(supabaseUrl, supabaseAnon, accessToken)
+    console.log('Auth check - GoTrue verify ok:', verified.ok)
+    if (!verified.ok) {
+      console.log('Auth check - GoTrue verify detail:', verified.detail)
+    }
+    if (!verified.ok) {
       return new Response(JSON.stringify({ ok: false, error: { message: 'Unauthorized' } }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

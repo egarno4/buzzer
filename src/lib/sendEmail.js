@@ -11,6 +11,8 @@ async function invokeSendEmail({ type, to, data }) {
   const headers = {}
   if (session?.access_token) {
     headers.Authorization = `Bearer ${session.access_token}`
+    // Fallback if the runtime does not forward Authorization to the function worker (some Edge paths).
+    headers['x-access-token'] = session.access_token
   }
 
   const { data: res, error } = await supabase.functions.invoke('send-email', {
