@@ -12,7 +12,7 @@ export default function MyPackageCard({ pkg, onGetHelp, onDismiss }) {
             <span style={{ fontSize: 12, color: '#c0c0c0' }}>{timeAgo(pkg.timestamp)}</span>
           </div>
           <div style={{ fontSize: 14, color: '#555', marginTop: 5 }}>
-            {done ? 'Neighbor spotted your package · Collected ✓' : 'Your neighbor spotted a package for you'}
+            {done ? 'Neighbor spotted your package · Collected ✓' : (pkg.subheadline ?? 'Your neighbor spotted a package for you')}
           </div>
           {pkg.note && <div style={{ marginTop: 8, background: '#f4f4f4', borderRadius: 8, padding: '7px 10px', fontSize: 13, color: '#666', fontStyle: 'italic' }}>&ldquo;{pkg.note}&rdquo;</div>}
           {!done && (
