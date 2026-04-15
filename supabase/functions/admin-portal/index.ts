@@ -6,8 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const FROM = 'noreply@buzzer.nyc'
-
 function timingSafeEqualString(a: string, b: string): boolean {
   const enc = new TextEncoder()
   const ba = enc.encode(a)
@@ -18,45 +16,38 @@ function timingSafeEqualString(a: string, b: string): boolean {
   return diff === 0
 }
 
-function escapeHtml(s: string) {
-  return String(s ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
-
-async function sendApprovalEmail(params: {
+async function sendAccountApprovedEmail(params: {
+  supabaseUrl: string
+  anonKey: string
+  inviteSecret: string
   to: string
   firstName: string
+  buildingAddress: string
   magicLink: string
 }): Promise<{ ok: true } | { ok: false; message: string }> {
-  const resendKey = Deno.env.get('RESEND_API_KEY')
-  if (!resendKey) {
-    return { ok: false, message: 'RESEND_API_KEY not configured on admin-portal function' }
-  }
-  const fn = escapeHtml((params.firstName || 'there').trim())
-  const subject = "You're approved — open Buzzer"
-  const html = `<p>Hey ${fn}!</p><p>Your building profile has been approved. Tap below to open Buzzer — you'll be signed in automatically.</p><p style="margin:24px 0"><a href="${escapeHtml(params.magicLink)}" style="display:inline-block;background:#D4773A;color:#fff;font-weight:700;padding:12px 20px;border-radius:10px;text-decoration:none">Open Buzzer</a></p><p style="font-size:13px;color:#666">If the button doesn't work, copy this link into your browser:<br/><span style="word-break:break-all">${escapeHtml(params.magicLink)}</span></p><p style="margin-top:24px">The Buzzer Team</p>`
-  const text = `Hey ${params.firstName || 'there'}!\n\nYour building profile has been approved. Open this link to sign in and go to Buzzer:\n\n${params.magicLink}\n\nThe Buzzer Team`
-
-  const res = await fetch('https://api.resend.com/emails', {
+  const url = `${params.supabaseUrl.replace(/\/$/, '')}/functions/v1/send-email`
+  const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${resendKey}`,
+      Authorization: `Bearer ${params.anonKey}`,
+      apikey: params.anonKey,
+      'x-invite-secret': params.inviteSecret,
     },
     body: JSON.stringify({
-      from: FROM,
-      to: [params.to.trim()],
-      subject,
-      html,
-      text,
+      type: 'account_approved',
+      to: params.to.trim(),
+      data: {
+        first_name: params.firstName,
+        building_address: params.buildingAddress,
+        magic_link: params.magicLink,
+      },
     }),
   })
-  const body = await res.json().catch(() => ({}))
-  if (!res.ok) {
-    return { ok: false, message: typeof body === 'object' && body && 'message' in body ? String(body.message) : res.statusText }
+  const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: { message?: string } }
+  if (!res.ok || body?.ok !== true) {
+    const msg = body?.error?.message ?? res.statusText
+    return { ok: false, message: msg }
   }
   return { ok: true }
 }
@@ -94,6 +85,8 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
   const serviceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+  const inviteSecret = Deno.env.get('INVITE_SECRET') ?? ''
   if (!supabaseUrl || !serviceRole) {
     return new Response(JSON.stringify({ ok: false, error: 'Missing Supabase admin configuration' }), {
       status: 500,
@@ -155,12 +148,23 @@ Deno.serve(async (req) => {
       })
     }
 
-    const redirectBase = (body.redirectBase ?? 'https://buzzer.nyc').replace(/\/$/, '')
-    const redirectTo = `${redirectBase}/app`
+    if (!anonKey || !inviteSecret) {
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          error: 'Configure SUPABASE_ANON_KEY and INVITE_SECRET on admin-portal (needed for approval email).',
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+
+    // Magic link must land on /app (not site root). Accept redirectBase with or without /app.
+    const rawBase = (body.redirectBase ?? 'https://buzzer.nyc').replace(/\/$/, '')
+    const redirectTo = rawBase.endsWith('/app') ? rawBase : `${rawBase}/app`
 
     const { data: profile, error: fetchErr } = await admin
       .from('profiles')
-      .select('id,email,first_name,status')
+      .select('id,email,first_name,status,address,approval_email_sent_at')
       .eq('id', userId)
       .maybeSingle()
 
@@ -171,19 +175,30 @@ Deno.serve(async (req) => {
       })
     }
 
-    if (profile.status !== 'pending') {
+    if (profile.status === 'approved' && profile.approval_email_sent_at) {
+      return new Response(JSON.stringify({ ok: true, skipped: 'already_approved_and_emailed' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const wasPending = profile.status === 'pending'
+    const resendAfterFailedEmail = profile.status === 'approved' && !profile.approval_email_sent_at
+
+    if (!wasPending && !resendAfterFailedEmail) {
       return new Response(JSON.stringify({ ok: false, error: 'Profile is not pending' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    const { error: updErr } = await admin.from('profiles').update({ status: 'approved' }).eq('id', userId).eq('status', 'pending')
-    if (updErr) {
-      return new Response(JSON.stringify({ ok: false, error: updErr.message }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    if (wasPending) {
+      const { error: updErr } = await admin.from('profiles').update({ status: 'approved' }).eq('id', userId).eq('status', 'pending')
+      if (updErr) {
+        return new Response(JSON.stringify({ ok: false, error: updErr.message }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
     }
 
     const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
@@ -193,7 +208,9 @@ Deno.serve(async (req) => {
     })
 
     if (linkErr) {
-      await admin.from('profiles').update({ status: 'pending' }).eq('id', userId)
+      if (wasPending) {
+        await admin.from('profiles').update({ status: 'pending' }).eq('id', userId)
+      }
       return new Response(JSON.stringify({ ok: false, error: linkErr.message }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -203,16 +220,22 @@ Deno.serve(async (req) => {
     const props = linkData?.properties as Record<string, string> | undefined
     const actionLink = props?.action_link ?? (linkData as unknown as { action_link?: string })?.action_link
     if (!actionLink) {
-      await admin.from('profiles').update({ status: 'pending' }).eq('id', userId)
+      if (wasPending) {
+        await admin.from('profiles').update({ status: 'pending' }).eq('id', userId)
+      }
       return new Response(JSON.stringify({ ok: false, error: 'generateLink did not return action_link' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    const sentMail = await sendApprovalEmail({
+    const sentMail = await sendAccountApprovedEmail({
+      supabaseUrl,
+      anonKey,
+      inviteSecret,
       to: profile.email,
       firstName: profile.first_name,
+      buildingAddress: profile.address ?? '',
       magicLink: actionLink,
     })
 
@@ -225,6 +248,15 @@ Deno.serve(async (req) => {
         }),
         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       )
+    }
+
+    const { error: stampErr } = await admin
+      .from('profiles')
+      .update({ approval_email_sent_at: new Date().toISOString() })
+      .eq('id', userId)
+
+    if (stampErr) {
+      console.warn('approval_email_sent_at update failed:', stampErr.message)
     }
 
     return new Response(JSON.stringify({ ok: true }), {

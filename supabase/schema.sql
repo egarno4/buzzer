@@ -5,7 +5,8 @@
 --    http://localhost:5173/onboarding/proof
 --    http://localhost:5173/app
 --    https://<your-vercel-domain>/onboarding/proof
---    https://buzzer.nyc/app   (post-approval magic link → MainApp)
+--    https://buzzer.nyc/app   (post-approval magic link → MainApp; REQUIRED in Redirect URLs)
+--       Same URL must be allowed so PKCE (?code=) / implicit (#access_token) returns land on MainApp.
 --    (and Site URL / additional redirect origins as needed)
 -- 2) Authentication → Providers → Email: enable; use magic link (or link + OTP off) for sign-in
 -- 3) Storage: if the bucket insert below fails, create bucket "proofs" (private) in the Dashboard, then re-run policies only
@@ -35,6 +36,12 @@ alter table public.profiles
   add column if not exists invite_sent boolean not null default false;
 alter table public.profiles
   add column if not exists application_received_email_sent_at timestamptz;
+alter table public.profiles
+  add column if not exists approval_email_sent_at timestamptz;
+
+-- Approval emails are sent from admin-portal → send-email (magic link). Drop legacy trigger if present.
+drop trigger if exists trg_profiles_account_approved_email on public.profiles;
+drop function if exists public.notify_send_account_approved_email();
 
 create policy "Users can insert own profile"
   on public.profiles for insert

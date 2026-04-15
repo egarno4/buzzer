@@ -217,19 +217,24 @@ Open Buzzer: ${cta}
   if (type === 'account_approved') {
     const firstName = typeof data.first_name === 'string' ? data.first_name : ''
     const buildingAddress = typeof data.building_address === 'string' ? data.building_address : ''
+    const magicLink = typeof data.magic_link === 'string' ? data.magic_link.trim() : ''
     const fn = (firstName || 'there').trim()
     const addr = (buildingAddress || 'your building').trim()
-    const subject = "✅ You're approved on Buzzer!"
-    const inner = `${wordmarkHtml()}<p style="margin:0 0 14px;">Hey ${escapeHtml(fn)}! 🎉</p><p style="margin:0 0 14px;">You’ve been approved on Buzzer for ${escapeHtml(addr)}.</p><p style="margin:0 0 14px;">Your neighbors are waiting — tap below to get started.</p>${ctaRow(APP_BASE, 'Open Buzzer')}<p style="margin:22px 0 0;font-size:14px;color:${BRAND.muted};">No doorman required. 🙌</p><p style="margin:18px 0 0;">The Buzzer Team</p>`
+    const ctaHref = magicLink || APP_BASE
+    const subject = "You're approved on Buzzer!"
+    const magicExtra = magicLink
+      ? `<p style="margin:14px 0 0;font-size:13px;color:${BRAND.muted};">Tap below to open Buzzer — you'll be signed in automatically.</p><p style="margin:12px 0 0;font-size:12px;color:${BRAND.muted};">If the button doesn't work, copy this link into your browser:<br/><span style="word-break:break-all">${escapeHtml(magicLink)}</span></p>`
+      : ''
+    const inner = `${wordmarkHtml()}<p style="margin:0 0 14px;">Hey ${escapeHtml(fn)}! 🎉</p><p style="margin:0 0 14px;">You’ve been approved on Buzzer for ${escapeHtml(addr)}.</p><p style="margin:0 0 14px;">Your neighbors are waiting — tap below to get started.</p>${ctaRow(ctaHref, 'Open Buzzer')}${magicExtra}<p style="margin:22px 0 0;font-size:14px;color:${BRAND.muted};">No doorman required. 🙌</p><p style="margin:18px 0 0;">The Buzzer Team</p>`
     const html = buzzerEmailShell(inner)
+    const textMagic = magicLink
+      ? `\n\nTap this link to open Buzzer and sign in automatically:\n${magicLink}\n`
+      : `\n\nOpen Buzzer: ${APP_BASE}\n`
     const text = `Hey ${fn}! 🎉
 
 You've been approved on Buzzer for ${addr}.
 
-Your neighbors are waiting — tap below to get started.
-
-Open Buzzer: ${APP_BASE}
-
+Your neighbors are waiting — tap below to get started.${textMagic}
 No doorman required. 🙌
 The Buzzer Team`
     return { subject, html, text }

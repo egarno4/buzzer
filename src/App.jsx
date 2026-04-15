@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { establishSessionFromUrl } from './lib/establishSessionFromUrl'
 import { supabase } from './lib/supabase'
 import Welcome from './pages/Welcome'
 import MainApp from './pages/MainApp'
@@ -39,6 +40,10 @@ export default function App() {
         return
       }
 
+      // Magic links (approval, etc.): establish session from URL before any redirect logic.
+      await establishSessionFromUrl()
+      if (!live) return
+
       const { data: sessionData } = await supabase.auth.getSession()
       const userId = sessionData.session?.user?.id
       if (!userId) {
@@ -48,7 +53,7 @@ export default function App() {
 
       const { data: profile, error: profileErr } = await supabase
         .from('profiles')
-        .select('id')
+        .select('id,status')
         .eq('id', userId)
         .maybeSingle()
 
@@ -58,15 +63,22 @@ export default function App() {
         if (location.pathname !== '/') {
           navigate('/', { replace: true })
         }
+        if (live) setCheckedProfileGate(true)
+        return
       }
-      setCheckedProfileGate(true)
+
+      if (profile.status === 'approved' && location.pathname === '/') {
+        navigate('/app', { replace: true })
+      }
+
+      if (live) setCheckedProfileGate(true)
     }
 
     void enforceProfileGate()
     return () => {
       live = false
     }
-  }, [navigate, location.pathname])
+  }, [navigate, location.pathname, location.search, location.hash])
 
   if (!checkedProfileGate) {
     return <div className="app-shell" />
