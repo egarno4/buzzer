@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import WelcomeOnboarding from '../components/WelcomeOnboarding'
 import FeedTab from '../components/mainapp/FeedTab'
 import MyPackagesTab from '../components/mainapp/MyPackagesTab'
 import { Avatar } from '../components/mainapp/shared'
@@ -100,6 +101,7 @@ function DemoProfile() {
 
 export default function Demo() {
   const [tab, setTab] = useState('packages')
+  const [showWelcomeOverlay, setShowWelcomeOverlay] = useState(true)
 
   const pkgTimestamp = useMemo(() => new Date().toISOString(), [])
 
@@ -389,6 +391,12 @@ export default function Demo() {
           </button>
         ))}
       </div>
+
+      <WelcomeOnboarding
+        open={showWelcomeOverlay}
+        onDismiss={() => setShowWelcomeOverlay(false)}
+        persistDismissal={false}
+      />
     </div>
   )
 }

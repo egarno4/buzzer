@@ -7,12 +7,14 @@ import ProfileTab from '../components/mainapp/ProfileTab'
 import RequestModal from '../components/mainapp/RequestModal'
 import useMainAppData from '../hooks/useMainAppData'
 import useMainAppRealtime from '../hooks/useMainAppRealtime'
+import WelcomeOnboarding, { hasWelcomeBeenDismissed } from '../components/WelcomeOnboarding'
 
 export default function MainApp() {
   const navigate = useNavigate()
   const [tab, setTab] = useState('packages')
   const [modal, setModal] = useState(null)
   const [showDismissToast, setShowDismissToast] = useState(false)
+  const [showWelcomeOverlay, setShowWelcomeOverlay] = useState(() => !hasWelcomeBeenDismissed())
   const {
     sessionChecked,
     profile,
@@ -157,6 +159,11 @@ export default function MainApp() {
       )}
       {modal === 'log' && <LogModal neighbors={approvedNeighbors} onSubmit={handleLog} onCancel={() => setModal(null)} />}
       {modal === 'request' && <RequestModal onSubmit={handleRequest} onCancel={() => setModal(null)} />}
+      <WelcomeOnboarding
+        open={showWelcomeOverlay}
+        onDismiss={() => setShowWelcomeOverlay(false)}
+        persistDismissal
+      />
     </div>
   )
 }
