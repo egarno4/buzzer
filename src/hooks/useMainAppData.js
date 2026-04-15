@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import {
+  sendHelpRequestedEmail,
+  sendPackageCollectedEmail,
   sendPackageSpottedEmail,
   sendVolunteerChosenEmail,
   sendVolunteerOfferedEmail,
@@ -160,7 +162,7 @@ export default function useMainAppData(navigate) {
       const result = await sendPackageSpottedEmail({
         to: recipient.email,
         firstName: recipient.first_name,
-        buildingAddress: profile.building,
+        loggerUnit: profile.unit,
       })
       if (!result.ok) window.alert('Spotted alert saved, but notification email failed to send.')
     }
@@ -184,6 +186,29 @@ export default function useMainAppData(navigate) {
       return false
     }
     setFeed((p) => [{ id: row.id, requester: row.requester_name, requesterUnit: row.requester_unit, timestamp: row.created_at, note: row.note, volunteers: [], status: row.status, chosenVolunteer: null }, ...p])
+
+    const { data: recipients, error: recErr } = await supabase.rpc('get_building_neighbor_emails_for_notifications', {
+      p_building: profile.building,
+    })
+    if (recErr) {
+      setError(recErr.message)
+    } else {
+      let anyFailed = false
+      for (const rec of recipients || []) {
+        const to = String(rec?.email || '').trim()
+        if (!to) continue
+        const result = await sendHelpRequestedEmail({
+          to,
+          firstName: rec.first_name || '',
+          requesterName: row.requester_name,
+          requesterUnit: row.requester_unit,
+          address: profile.building,
+          note: row.note || '',
+        })
+        if (!result.ok) anyFailed = true
+      }
+      if (anyFailed) window.alert('Your post is live, but some neighbor notification emails failed to send.')
+    }
     return true
   }, [profile])
 
@@ -215,6 +240,7 @@ export default function useMainAppData(navigate) {
         firstName: requester.first_name,
         volunteerName: name,
         volunteerUnit: unit,
+        requestId: id,
       })
       if (!result.ok) window.alert('Volunteer saved, but notification email failed to send.')
     }
@@ -253,12 +279,40 @@ export default function useMainAppData(navigate) {
   }, [])
 
   const markRequestCollected = useCallback(async (id) => {
-    const { error: upErr } = await supabase.from('requests').update({ status: 'collected' }).eq('id', id)
+    const { data: req, error: selErr } = await supabase
+      .from('requests')
+      .select('building_address, requester_name, chosen_volunteer_unit, status')
+      .eq('id', id)
+      .maybeSingle()
+    if (selErr || !req) {
+      if (selErr) setError(selErr.message)
+      return
+    }
+    if (req.status !== 'claimed' || !req.chosen_volunteer_unit) {
+      setError('That request is not ready to mark as collected.')
+      return
+    }
+
+    const { error: upErr } = await supabase.from('requests').update({ status: 'collected' }).eq('id', id).eq('status', 'claimed')
     if (upErr) {
       setError(upErr.message)
       return
     }
     setFeed((p) => p.filter((x) => x.id !== id))
+
+    const volUnit = String(req.chosen_volunteer_unit).trim()
+    const { data: holder } = await supabase.rpc('neighbor_contact_for_unit', {
+      p_building: req.building_address,
+      p_unit: volUnit,
+    })
+    if (holder?.email && holder.email_notifications !== false) {
+      const result = await sendPackageCollectedEmail({
+        to: holder.email,
+        firstName: holder.first_name,
+        collectorName: req.requester_name,
+      })
+      if (!result.ok) window.alert('Marked as collected, but we could not email the neighbor who held it.')
+    }
   }, [])
 
   const updateEmailNotifications = useCallback(async (enabled) => {

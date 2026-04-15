@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import FeedTab from '../components/mainapp/FeedTab'
 import LogModal from '../components/mainapp/LogModal'
 import MyPackagesTab from '../components/mainapp/MyPackagesTab'
@@ -11,8 +11,10 @@ import WelcomeOnboarding, { hasWelcomeBeenDismissed } from '../components/Welcom
 
 export default function MainApp() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [tab, setTab] = useState('packages')
   const [modal, setModal] = useState(null)
+  const [expandRequestId, setExpandRequestId] = useState(null)
   const [showDismissToast, setShowDismissToast] = useState(false)
   const [showWelcomeOverlay, setShowWelcomeOverlay] = useState(() => !hasWelcomeBeenDismissed())
   const {
@@ -41,6 +43,36 @@ export default function MainApp() {
     return () => window.clearTimeout(timer)
   }, [showDismissToast])
   useMainAppRealtime({ profile, loadAll })
+
+  const DEEPLINK_KEY = 'buzzer_app_deeplink_v1'
+
+  useEffect(() => {
+    if (location.pathname !== '/app') return
+
+    if (location.search) {
+      const sp = new URLSearchParams(location.search)
+      const payload = { tab: sp.get('tab'), modal: sp.get('modal'), request: sp.get('request') }
+      try {
+        window.sessionStorage.setItem(DEEPLINK_KEY, JSON.stringify(payload))
+      } catch {
+        /* ignore */
+      }
+      navigate('/app', { replace: true })
+      return
+    }
+
+    try {
+      const raw = window.sessionStorage.getItem(DEEPLINK_KEY)
+      if (!raw) return
+      window.sessionStorage.removeItem(DEEPLINK_KEY)
+      const d = JSON.parse(raw)
+      if (d.tab === 'feed') setTab('feed')
+      if (d.modal === 'request') setModal('request')
+      if (d.request) setExpandRequestId(String(d.request))
+    } catch {
+      /* ignore */
+    }
+  }, [location.pathname, location.search, navigate])
 
   function handleGetHelpFromPackage() {
     setModal('request')
@@ -109,6 +141,7 @@ export default function MainApp() {
           <FeedTab
             feed={feed}
             myUnit={profile.unit}
+            expandRequestId={expandRequestId}
             onVolunteer={handleVolunteer}
             onChoose={handleChoose}
             onMarkCollected={handleMarkCollected}

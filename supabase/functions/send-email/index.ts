@@ -7,14 +7,23 @@ const corsHeaders = {
 }
 
 const FROM = 'noreply@buzzer.nyc'
-const APP_URL = 'https://buzzer.nyc/app'
+const APP_BASE = 'https://buzzer.nyc/app'
 const HOME_URL = 'https://buzzer.nyc'
-const OPEN_BUZZER_URL = 'https://buzzer.nyc'
+
+const BRAND = {
+  bg: '#F5F0E8',
+  accent: '#D4773A',
+  dark: '#1C1812',
+  muted: '#6b5f52',
+  line: '#E8E1D5',
+}
 
 const EMAIL_TYPES = [
   'package_spotted',
+  'help_requested',
   'volunteer_offered',
   'volunteer_chosen',
+  'package_collected',
   'building_invite',
   'account_approved',
   'application_received',
@@ -29,12 +38,24 @@ function escapeHtml(s: string) {
     .replace(/"/g, '&quot;')
 }
 
-function viewInBuzzerHtml() {
-  return `<p style="margin:20px 0 0"><a href="${APP_URL}" style="color:#D4773A;font-weight:700">View in Buzzer →</a></p>`
+function buzzerEmailShell(innerHtml: string) {
+  const font =
+    "https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@700&display=swap"
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><link rel="stylesheet" href="${font}"/></head><body style="margin:0;background:${BRAND.bg};"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.bg};padding:28px 16px;font-family:Barlow,Helvetica Neue,Arial,sans-serif;color:${BRAND.dark};font-size:16px;line-height:1.55;"><tr><td align="center"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;border:1px solid ${BRAND.line};overflow:hidden;box-shadow:0 4px 24px rgba(28,24,18,0.06);"><tr><td style="padding:22px 24px 26px;">${innerHtml}</td></tr></table><p style="max-width:560px;margin:18px auto 0;font-size:12px;color:${BRAND.muted};text-align:center;">Buzzer · buzzer.nyc</p></td></tr></table></body></html>`
 }
 
-function viewInBuzzerText() {
-  return `View in Buzzer: ${APP_URL}`
+function ctaRow(href: string, label: string) {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:26px 0 0;"><tr><td><a href="${escapeHtml(href)}" style="display:inline-block;background:${BRAND.accent};color:#ffffff;font-weight:700;padding:14px 22px;border-radius:10px;text-decoration:none;font-size:16px;">${escapeHtml(label)}</a></td></tr></table>`
+}
+
+function wordmarkHtml() {
+  return `<p style="margin:0 0 18px;font-family:'Barlow Condensed',Barlow,sans-serif;font-size:20px;font-weight:800;letter-spacing:0.02em;text-transform:uppercase;color:${BRAND.dark};line-height:1;">BUZZ<span style="color:${BRAND.accent};">ER</span></p>`
+}
+
+function truncateNote(s: string, max = 400) {
+  const t = String(s ?? '').trim()
+  if (t.length <= max) return t
+  return `${t.slice(0, max - 1)}…`
 }
 
 function isNonEmptyString(v: unknown): v is string {
@@ -90,24 +111,69 @@ function buildEmail(
 ): { subject: string; html: string; text: string } | { error: string } {
   if (type === 'package_spotted') {
     const firstName = typeof data.firstName === 'string' ? data.firstName : ''
-    const buildingAddress = typeof data.buildingAddress === 'string' ? data.buildingAddress : ''
+    const loggerUnit = typeof data.loggerUnit === 'string' ? data.loggerUnit : ''
     const fn = (firstName || 'there').trim()
-    const addr = (buildingAddress || 'your building').trim()
-    const subject = '📦 Someone spotted a package for you!'
-    const html = `<p>Hey ${escapeHtml(fn)}! A neighbor spotted a package for you at ${escapeHtml(addr)}. Log in to Buzzer to take action.</p>${viewInBuzzerHtml()}`
-    const text = `Hey ${fn}! A neighbor spotted a package for you at ${addr}. Log in to Buzzer to take action.\n\n${viewInBuzzerText()}`
+    const lu = loggerUnit.trim() || '—'
+    const subject = '📦 Heads up — a package might be yours'
+    const cta = `${APP_BASE}?modal=request`
+    const inner = `${wordmarkHtml()}<p style="margin:0 0 14px;">Hi ${escapeHtml(fn)},</p><p style="margin:0 0 14px;">Your neighbor in Unit ${escapeHtml(lu)} spotted a package in the lobby that looks like it could be yours. Head home to grab it, or if you need someone to hold it for you, post a request to your building feed.</p>${ctaRow(cta, 'Request Help from Neighbors')}`
+    const html = buzzerEmailShell(inner)
+    const text = `Hi ${fn},
+
+Your neighbor in Unit ${lu} spotted a package in the lobby that looks like it could be yours. Head home to grab it, or if you need someone to hold it for you, post a request to your building feed.
+
+Request Help from Neighbors: ${cta}
+
+— The Buzzer Team`
+    return { subject, html, text }
+  }
+  if (type === 'help_requested') {
+    const firstName = typeof data.firstName === 'string' ? data.firstName : ''
+    const requesterName = typeof data.requesterName === 'string' ? data.requesterName : ''
+    const requesterUnit = typeof data.requesterUnit === 'string' ? data.requesterUnit : ''
+    const address = typeof data.address === 'string' ? data.address : ''
+    const note = truncateNote(typeof data.note === 'string' ? data.note : '')
+    const fn = (firstName || 'there').trim()
+    const rn = (requesterName || 'A neighbor').trim()
+    const ru = requesterUnit.trim() || '—'
+    const addr = (address || 'your building').trim()
+    const subject = '🙋 A neighbor needs help with a package'
+    const cta = `${APP_BASE}?tab=feed`
+    const noteBlock = note
+      ? `<p style="margin:0 0 14px;color:${BRAND.muted};font-size:15px;">“${escapeHtml(note)}”</p>`
+      : ''
+    const inner = `${wordmarkHtml()}<p style="margin:0 0 14px;">Hi ${escapeHtml(fn)},</p><p style="margin:0 0 14px;">${escapeHtml(rn)} in Unit ${escapeHtml(ru)} at ${escapeHtml(addr)} is expecting a delivery and needs a neighbor to hold it until they get home.</p>${noteBlock}<p style="margin:0 0 14px;">Tap below to volunteer — they’ll choose who holds it.</p>${ctaRow(cta, 'Offer to Help')}`
+    const html = buzzerEmailShell(inner)
+    const textNote = note ? `\n\n“${note}”\n` : '\n'
+    const text = `Hi ${fn},
+
+${rn} in Unit ${ru} at ${addr} is expecting a delivery and needs a neighbor to hold it until they get home.${textNote}
+Tap below to volunteer — they'll choose who holds it.
+
+Offer to Help: ${cta}
+
+— The Buzzer Team`
     return { subject, html, text }
   }
   if (type === 'volunteer_offered') {
     const firstName = typeof data.firstName === 'string' ? data.firstName : ''
     const volunteerName = typeof data.volunteerName === 'string' ? data.volunteerName : ''
     const volunteerUnit = typeof data.volunteerUnit === 'string' ? data.volunteerUnit : ''
+    const requestId = typeof data.requestId === 'string' ? data.requestId : ''
     const fn = (firstName || 'there').trim()
     const vn = (volunteerName || 'A neighbor').trim()
-    const vu = volunteerUnit.trim()
-    const subject = '🙋 A neighbor offered to help!'
-    const html = `<p>Hey ${escapeHtml(fn)}! ${escapeHtml(vn)} in Unit ${escapeHtml(vu)} offered to hold your package. Log in to choose them or wait for more volunteers.</p>${viewInBuzzerHtml()}`
-    const text = `Hey ${fn}! ${vn} in Unit ${vu} offered to hold your package. Log in to choose them or wait for more volunteers.\n\n${viewInBuzzerText()}`
+    const vu = volunteerUnit.trim() || '—'
+    const subject = '🙌 A neighbor offered to help'
+    const cta = requestId ? `${APP_BASE}?tab=feed&request=${encodeURIComponent(requestId)}` : `${APP_BASE}?tab=feed`
+    const inner = `${wordmarkHtml()}<p style="margin:0 0 14px;">Hi ${escapeHtml(fn)},</p><p style="margin:0 0 14px;">${escapeHtml(vn)} in Unit ${escapeHtml(vu)} has offered to hold your package. Open Buzzer to review your volunteers and choose who holds it — you stay in control of who you interact with.</p>${ctaRow(cta, 'Choose Who Holds It')}`
+    const html = buzzerEmailShell(inner)
+    const text = `Hi ${fn},
+
+${vn} in Unit ${vu} has offered to hold your package. Open Buzzer to review your volunteers and choose who holds it — you stay in control of who you interact with.
+
+Choose Who Holds It: ${cta}
+
+— The Buzzer Team`
     return { subject, html, text }
   }
   if (type === 'volunteer_chosen') {
@@ -116,10 +182,36 @@ function buildEmail(
     const requesterUnit = typeof data.requesterUnit === 'string' ? data.requesterUnit : ''
     const fn = (firstName || 'there').trim()
     const rn = (requesterName || 'A neighbor').trim()
-    const ru = requesterUnit.trim()
+    const ru = requesterUnit.trim() || '—'
     const subject = "✅ You've been chosen to hold a package!"
-    const html = `<p>Hey ${escapeHtml(fn)}! ${escapeHtml(rn)} in Unit ${escapeHtml(ru)} chose you to hold their package. Please grab it when you can!</p>${viewInBuzzerHtml()}`
-    const text = `Hey ${fn}! ${rn} in Unit ${ru} chose you to hold their package. Please grab it when you can!\n\n${viewInBuzzerText()}`
+    const cta = `${APP_BASE}?tab=feed`
+    const inner = `${wordmarkHtml()}<p style="margin:0 0 14px;">Hey ${escapeHtml(fn)},</p><p style="margin:0 0 14px;">${escapeHtml(rn)} in Unit ${escapeHtml(ru)} chose you to hold their package. When you can, grab it from the lobby — they’re counting on you.</p>${ctaRow(cta, 'Open Buzzer')}`
+    const html = buzzerEmailShell(inner)
+    const text = `Hey ${fn},
+
+${rn} in Unit ${ru} chose you to hold their package. When you can, grab it from the lobby — they're counting on you.
+
+Open Buzzer: ${cta}
+
+— The Buzzer Team`
+    return { subject, html, text }
+  }
+  if (type === 'package_collected') {
+    const firstName = typeof data.firstName === 'string' ? data.firstName : ''
+    const collectorName = typeof data.collectorName === 'string' ? data.collectorName : ''
+    const fn = (firstName || 'there').trim()
+    const cn = (collectorName || 'Your neighbor').trim()
+    const subject = '✅ Package collected — thanks for helping!'
+    const cta = APP_BASE
+    const inner = `${wordmarkHtml()}<p style="margin:0 0 14px;">Hi ${escapeHtml(fn)},</p><p style="margin:0 0 14px;">${escapeHtml(cn)} just picked up their package. You’re a good neighbor — that’s what Buzzer is all about.</p>${ctaRow(cta, 'Open Buzzer')}`
+    const html = buzzerEmailShell(inner)
+    const text = `Hi ${fn},
+
+${cn} just picked up their package. You're a good neighbor — that's what Buzzer is all about.
+
+Open Buzzer: ${cta}
+
+— The Buzzer Team`
     return { subject, html, text }
   }
   if (type === 'account_approved') {
@@ -128,8 +220,18 @@ function buildEmail(
     const fn = (firstName || 'there').trim()
     const addr = (buildingAddress || 'your building').trim()
     const subject = "✅ You're approved on Buzzer!"
-    const html = `<p>Hey ${escapeHtml(fn)}! 🎉</p><p>You've been approved on Buzzer for ${escapeHtml(addr)}.</p><p>Your neighbors are waiting — tap below to get started:</p><p style="margin:20px 0 0"><a href="${OPEN_BUZZER_URL}" style="color:#D4773A;font-weight:700">Open Buzzer →</a></p><p style="margin:20px 0 0">No doorman required. 🙌</p><p style="margin:24px 0 0">The Buzzer Team</p>`
-    const text = `Hey ${fn}! 🎉\n\nYou've been approved on Buzzer for ${addr}.\n\nYour neighbors are waiting — tap below to get started:\n\nOpen Buzzer → (${OPEN_BUZZER_URL})\n\nNo doorman required. 🙌\nThe Buzzer Team`
+    const inner = `${wordmarkHtml()}<p style="margin:0 0 14px;">Hey ${escapeHtml(fn)}! 🎉</p><p style="margin:0 0 14px;">You’ve been approved on Buzzer for ${escapeHtml(addr)}.</p><p style="margin:0 0 14px;">Your neighbors are waiting — tap below to get started.</p>${ctaRow(APP_BASE, 'Open Buzzer')}<p style="margin:22px 0 0;font-size:14px;color:${BRAND.muted};">No doorman required. 🙌</p><p style="margin:18px 0 0;">The Buzzer Team</p>`
+    const html = buzzerEmailShell(inner)
+    const text = `Hey ${fn}! 🎉
+
+You've been approved on Buzzer for ${addr}.
+
+Your neighbors are waiting — tap below to get started.
+
+Open Buzzer: ${APP_BASE}
+
+No doorman required. 🙌
+The Buzzer Team`
     return { subject, html, text }
   }
   if (type === 'building_invite') {
@@ -138,8 +240,18 @@ function buildEmail(
     const fn = (firstName || 'there').trim()
     const addr = (buildingAddress || 'your building').trim()
     const subject = '🏠 Your building just joined Buzzer!'
-    const html = `<p>Hey ${escapeHtml(fn)}!</p><p>Your building at ${escapeHtml(addr)} has joined Buzzer — the app that helps neighbors keep each other's packages safe. No doorman required. 🙌</p><p>Your landlord has already verified your address so you're good to go. Click below to activate your account:</p><p style="margin:20px 0 0"><a href="${HOME_URL}" style="color:#D4773A;font-weight:700">Activate My Account →</a></p><p style="margin:24px 0 0">See you in the building,<br/>The Buzzer Team</p>`
-    const text = `Hey ${fn}!\n\nYour building at ${addr} has joined Buzzer - the app that helps neighbors keep each other's packages safe. No doorman required.\n\nYour landlord has already verified your address so you're good to go. Click below to activate your account:\n\nActivate My Account: ${HOME_URL}\n\nSee you in the building,\nThe Buzzer Team`
+    const inner = `${wordmarkHtml()}<p style="margin:0 0 14px;">Hey ${escapeHtml(fn)}!</p><p style="margin:0 0 14px;">Your building at ${escapeHtml(addr)} has joined Buzzer — the app that helps neighbors keep each other’s packages safe. No doorman required. 🙌</p><p style="margin:0 0 14px;">Your landlord has already verified your address, so you’re good to go. Tap below to activate your account.</p>${ctaRow(HOME_URL, 'Activate My Account')}<p style="margin:22px 0 0;">See you in the building,<br/>The Buzzer Team</p>`
+    const html = buzzerEmailShell(inner)
+    const text = `Hey ${fn}!
+
+Your building at ${addr} has joined Buzzer — the app that helps neighbors keep each other's packages safe. No doorman required.
+
+Your landlord has already verified your address, so you're good to go.
+
+Activate My Account: ${HOME_URL}
+
+See you in the building,
+The Buzzer Team`
     return { subject, html, text }
   }
   if (type === 'application_received') {
@@ -150,11 +262,8 @@ function buildEmail(
     const addr = (address || 'your building').trim()
     const u = unit.trim()
     const subject = 'We got your Buzzer application 📦'
-    const html = `<p>Hi ${escapeHtml(fn)},</p>
-<p>Thanks for joining Buzzer — we're glad you're here. We've got your application for ${escapeHtml(addr)}, Unit ${escapeHtml(u)}, and we're looking over your proof of residence now.</p>
-<p>You'll hear from us again within a few hours once you're approved. That next email will include a link that signs you straight into the app.</p>
-<p>If anything's on your mind before then, just hit reply — a real human reads this inbox.</p>
-<p style="margin:28px 0 0">— The Buzzer Team<br/>buzzer.nyc</p>`
+    const inner = `${wordmarkHtml()}<p style="margin:0 0 14px;">Hi ${escapeHtml(fn)},</p><p style="margin:0 0 14px;">Thanks for joining Buzzer — we’re glad you’re here. We’ve got your application for ${escapeHtml(addr)}, Unit ${escapeHtml(u)}, and we’re looking over your proof of residence now.</p><p style="margin:0 0 14px;">You’ll hear from us again within a few hours once you’re approved. That next email will include a link that signs you straight into the app.</p><p style="margin:0 0 14px;">If anything’s on your mind before then, just hit reply — a real human reads this inbox.</p><p style="margin:22px 0 0;">— The Buzzer Team<br/>buzzer.nyc</p>`
+    const html = buzzerEmailShell(inner)
     const text = `Hi ${fn},
 
 Thanks for joining Buzzer — we're glad you're here. We've got your application for ${addr}, Unit ${u}, and we're looking over your proof of residence now.

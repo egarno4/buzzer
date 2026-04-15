@@ -1,11 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Avatar, timeAgo } from '../shared'
 
-export default function FeedCard({ post, myUnit, onVolunteer, onChoose, onMarkCollected }) {
+export default function FeedCard({ post, myUnit, expandRequestId, onVolunteer, onChoose, onMarkCollected }) {
   const isMine = post.requesterUnit === myUnit
   const claimed = post.status === 'claimed'
   const hasVol = post.volunteers.some((v) => v.unit === myUnit)
   const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (expandRequestId && expandRequestId === post.id && isMine && !claimed && post.volunteers.length > 0) {
+      setOpen(true)
+    }
+  }, [expandRequestId, post.id, isMine, claimed, post.volunteers.length])
 
   return (
     <div style={{ background: claimed ? '#fafafa' : '#fff', border: `1.5px solid ${isMine && !claimed ? '#D4773A' : '#efefef'}`, borderRadius: 16, padding: 16, marginBottom: 12, opacity: claimed ? 0.65 : 1 }}>

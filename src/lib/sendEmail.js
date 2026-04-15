@@ -33,13 +33,31 @@ async function invokeSendEmail({ type, to, data }) {
 }
 
 /**
- * Package spotted — notify recipient unit.
+ * Package spotted — notify recipient unit (private; not posted to feed).
  */
-export async function sendPackageSpottedEmail({ to, firstName, buildingAddress }) {
+export async function sendPackageSpottedEmail({ to, firstName, loggerUnit }) {
   return invokeSendEmail({
     type: 'package_spotted',
     to,
-    data: { firstName, buildingAddress },
+    data: { firstName, loggerUnit },
+  })
+}
+
+/**
+ * New help request posted — notify other approved residents in the building.
+ */
+export async function sendHelpRequestedEmail({
+  to,
+  firstName,
+  requesterName,
+  requesterUnit,
+  address,
+  note,
+}) {
+  return invokeSendEmail({
+    type: 'help_requested',
+    to,
+    data: { firstName, requesterName, requesterUnit, address, note },
   })
 }
 
@@ -51,11 +69,12 @@ export async function sendVolunteerOfferedEmail({
   firstName,
   volunteerName,
   volunteerUnit,
+  requestId,
 }) {
   return invokeSendEmail({
     type: 'volunteer_offered',
     to,
-    data: { firstName, volunteerName, volunteerUnit },
+    data: { firstName, volunteerName, volunteerUnit, requestId },
   })
 }
 
@@ -72,6 +91,17 @@ export async function sendVolunteerChosenEmail({
     type: 'volunteer_chosen',
     to,
     data: { firstName, requesterName, requesterUnit },
+  })
+}
+
+/**
+ * Requester marked package collected — thank the neighbor who held it.
+ */
+export async function sendPackageCollectedEmail({ to, firstName, collectorName }) {
+  return invokeSendEmail({
+    type: 'package_collected',
+    to,
+    data: { firstName, collectorName },
   })
 }
 
