@@ -114,7 +114,7 @@ export default function WelcomeOnboarding({ open, onDismiss, persistDismissal = 
   align-items: stretch;
   overflow: hidden;
   overscroll-behavior: none;
-  padding: max(12px, env(safe-area-inset-top)) 16px max(12px, env(safe-area-inset-bottom));
+  padding: max(10px, env(safe-area-inset-top)) 18px max(12px, env(safe-area-inset-bottom));
   min-height: 100vh;
   height: 100vh;
   max-height: 100vh;
@@ -131,21 +131,22 @@ export default function WelcomeOnboarding({ open, onDismiss, persistDismissal = 
   text-align: center;
 }
 .welcome-onboarding-wordmark {
-  font-size: 22px;
+  font-size: 34px;
   font-weight: 900;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   font-family: 'Barlow Condensed', sans-serif;
   text-transform: uppercase;
   color: ${DARK};
-  margin-bottom: 6px;
+  line-height: 1;
+  margin-bottom: 10px;
 }
 .welcome-onboarding-subtitle {
-  margin: 0 0 12px;
-  font-size: 13px;
-  font-weight: 600;
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 700;
   color: #9C8F7A;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
 }
 .welcome-card-wrap {
   flex: 1;
@@ -159,7 +160,6 @@ export default function WelcomeOnboarding({ open, onDismiss, persistDismissal = 
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  border-radius: 16px;
   width: 100%;
 }
 .welcome-card-track {
@@ -173,80 +173,80 @@ export default function WelcomeOnboarding({ open, onDismiss, persistDismissal = 
   flex-shrink: 0;
   height: 100%;
   min-height: 0;
-  padding: 0 4px;
+  padding: 0 6px;
   box-sizing: border-box;
   display: flex;
-  align-items: stretch;
+  align-items: center;
+  justify-content: center;
 }
-.welcome-card {
+.welcome-slide-inner {
   width: 100%;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  border: 1.5px solid #E8E1D5;
-  border-radius: 16px;
-  background: #fff;
-  padding: 18px 18px 16px;
-  text-align: center;
-  font-family: inherit;
+  max-width: 320px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
-  gap: 10px;
-  box-shadow: 0 4px 20px rgba(28,24,18,0.06);
+  text-align: center;
+  gap: 14px;
+  padding: 4px 0 8px;
   box-sizing: border-box;
+  background: transparent;
+  border: none;
+  font-family: inherit;
 }
-.welcome-card--button {
+.welcome-slide-inner--button {
   cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
 }
-.welcome-card--static {
+.welcome-slide-inner--static {
   cursor: default;
 }
-.welcome-card-icon {
-  font-size: 44px;
+.welcome-slide-icon {
+  font-size: 60px;
   line-height: 1;
   flex-shrink: 0;
 }
-.welcome-card-title {
+.welcome-slide-title {
   font-family: 'Barlow Condensed', sans-serif;
   font-weight: 800;
-  font-size: 20px;
+  font-size: 30px;
   letter-spacing: 0.04em;
   color: ${DARK};
   text-transform: uppercase;
+  line-height: 1.08;
   flex-shrink: 0;
 }
-.welcome-card-body {
-  font-size: 14px;
+.welcome-slide-body {
+  font-size: 16px;
   line-height: 1.5;
-  color: rgba(28,24,18,0.78);
+  font-weight: 500;
+  color: rgba(28,24,18,0.82);
   margin: 0;
-  flex: 1;
-  min-height: 0;
+  max-width: 280px;
+  width: 100%;
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 8;
-  line-clamp: 8;
-  align-self: stretch;
+  -webkit-line-clamp: 9;
+  line-clamp: 9;
 }
-.welcome-card-hint {
-  font-size: 12px;
+.welcome-slide-hint {
+  font-size: 14px;
   font-weight: 700;
   color: ${ACCENT};
-  margin-top: 2px;
   flex-shrink: 0;
+  margin-top: 2px;
 }
 .welcome-onboarding-footer {
   flex-shrink: 0;
-  padding-top: 12px;
+  padding-top: 18px;
 }
 .welcome-dots {
   display: flex;
   justify-content: center;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 14px;
 }
 .welcome-dot {
   height: 8px;
@@ -279,7 +279,7 @@ export default function WelcomeOnboarding({ open, onDismiss, persistDismissal = 
 }
 .welcome-btn-secondary {
   width: 100%;
-  padding: 12px 18px;
+  padding: 13px 18px;
   border-radius: 12px;
   border: 2px solid ${DARK};
   background: transparent;
@@ -291,51 +291,49 @@ export default function WelcomeOnboarding({ open, onDismiss, persistDismissal = 
 }
 @media (max-height: 700px) {
   .welcome-onboarding-root {
-    padding: max(8px, env(safe-area-inset-top)) 12px max(10px, env(safe-area-inset-bottom));
+    padding: max(6px, env(safe-area-inset-top)) 14px max(8px, env(safe-area-inset-bottom));
   }
   .welcome-onboarding-wordmark {
-    font-size: 18px;
-    margin-bottom: 4px;
+    font-size: 28px;
+    margin-bottom: 6px;
   }
   .welcome-onboarding-subtitle {
-    font-size: 11px;
-    margin-bottom: 8px;
-    letter-spacing: 0.06em;
+    font-size: 12px;
+    margin-bottom: 4px;
+    letter-spacing: 0.1em;
   }
-  .welcome-card {
-    padding: 14px 12px;
-    gap: 7px;
-    border-radius: 14px;
+  .welcome-slide-inner {
+    gap: 10px;
+    padding: 2px 0 4px;
   }
-  .welcome-card-icon {
-    font-size: 34px;
+  .welcome-slide-icon {
+    font-size: 54px;
   }
-  .welcome-card-title {
-    font-size: 16px;
+  .welcome-slide-title {
+    font-size: 26px;
     letter-spacing: 0.03em;
   }
-  .welcome-card-body {
-    font-size: 12px;
-    line-height: 1.42;
+  .welcome-slide-body {
+    font-size: 14px;
+    line-height: 1.45;
     -webkit-line-clamp: 7;
     line-clamp: 7;
   }
-  .welcome-card-hint {
-    font-size: 11px;
-    margin-top: 0;
+  .welcome-slide-hint {
+    font-size: 12px;
   }
   .welcome-onboarding-footer {
-    padding-top: 8px;
+    padding-top: 12px;
   }
   .welcome-dots {
-    margin-bottom: 8px;
+    margin-bottom: 10px;
   }
   .welcome-btn-primary {
-    padding: 11px 16px;
+    padding: 12px 16px;
     font-size: 15px;
   }
   .welcome-btn-secondary {
-    padding: 10px 16px;
+    padding: 11px 16px;
     font-size: 14px;
   }
 }
@@ -363,26 +361,26 @@ export default function WelcomeOnboarding({ open, onDismiss, persistDismissal = 
               return (
                 <div key={card.title} className="welcome-slide-col">
                   {cardIsLast ? (
-                    <div className="welcome-card welcome-card--static">
-                      <span className="welcome-card-icon" aria-hidden>
+                    <div className="welcome-slide-inner welcome-slide-inner--static">
+                      <span className="welcome-slide-icon" aria-hidden>
                         {card.icon}
                       </span>
-                      <span className="welcome-card-title">{card.title}</span>
-                      <span className="welcome-card-body">{card.body}</span>
+                      <span className="welcome-slide-title">{card.title}</span>
+                      <span className="welcome-slide-body">{card.body}</span>
                     </div>
                   ) : (
                     <button
                       type="button"
-                      className="welcome-card welcome-card--button"
+                      className="welcome-slide-inner welcome-slide-inner--button"
                       onClick={goNext}
                       aria-label="Next tip"
                     >
-                      <span className="welcome-card-icon" aria-hidden>
+                      <span className="welcome-slide-icon" aria-hidden>
                         {card.icon}
                       </span>
-                      <span className="welcome-card-title">{card.title}</span>
-                      <span className="welcome-card-body">{card.body}</span>
-                      <span className="welcome-card-hint">Tap or swipe for next →</span>
+                      <span className="welcome-slide-title">{card.title}</span>
+                      <span className="welcome-slide-body">{card.body}</span>
+                      <span className="welcome-slide-hint">Tap or swipe for next →</span>
                     </button>
                   )}
                 </div>
