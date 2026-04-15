@@ -1,0 +1,4 @@
+# Supabase CLI: https://supabase.com/docs/guides/cli/config
+# Admin portal is called from the browser with a shared secret (ADMIN_PASSWORD), not end-user JWTs.
+[functions.admin-portal]
+verify_jwt = false

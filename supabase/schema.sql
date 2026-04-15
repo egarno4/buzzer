@@ -3,7 +3,9 @@
 -- Also configure:
 -- 1) Authentication → URL configuration → Redirect URLs: include
 --    http://localhost:5173/onboarding/proof
+--    http://localhost:5173/app
 --    https://<your-vercel-domain>/onboarding/proof
+--    https://buzzer.nyc/app   (post-approval magic link → MainApp)
 --    (and Site URL / additional redirect origins as needed)
 -- 2) Authentication → Providers → Email: enable; use magic link (or link + OTP off) for sign-in
 -- 3) Storage: if the bucket insert below fails, create bucket "proofs" (private) in the Dashboard, then re-run policies only

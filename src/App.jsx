@@ -12,6 +12,7 @@ import Pending from './pages/Pending'
 import Privacy from './pages/Privacy'
 import Terms from './pages/Terms'
 import Demo from './pages/Demo'
+import Admin from './pages/Admin'
 
 export default function App() {
   const navigate = useNavigate()
@@ -28,7 +29,12 @@ export default function App() {
       }
 
       // Public legal pages — no profile required.
-      if (location.pathname === '/privacy' || location.pathname === '/terms' || location.pathname === '/demo') {
+      if (
+        location.pathname === '/privacy' ||
+        location.pathname === '/terms' ||
+        location.pathname === '/demo' ||
+        location.pathname === '/admin'
+      ) {
         if (live) setCheckedProfileGate(true)
         return
       }
@@ -80,6 +86,7 @@ export default function App() {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/demo" element={<Demo />} />
+        <Route path="/admin" element={<Admin />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
