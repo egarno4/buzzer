@@ -17,6 +17,7 @@ const EMAIL_TYPES = [
   'volunteer_chosen',
   'building_invite',
   'account_approved',
+  'application_received',
 ] as const
 type EmailType = (typeof EMAIL_TYPES)[number]
 
@@ -139,6 +140,31 @@ function buildEmail(
     const subject = '🏠 Your building just joined Buzzer!'
     const html = `<p>Hey ${escapeHtml(fn)}!</p><p>Your building at ${escapeHtml(addr)} has joined Buzzer — the app that helps neighbors keep each other's packages safe. No doorman required. 🙌</p><p>Your landlord has already verified your address so you're good to go. Click below to activate your account:</p><p style="margin:20px 0 0"><a href="${HOME_URL}" style="color:#D4773A;font-weight:700">Activate My Account →</a></p><p style="margin:24px 0 0">See you in the building,<br/>The Buzzer Team</p>`
     const text = `Hey ${fn}!\n\nYour building at ${addr} has joined Buzzer - the app that helps neighbors keep each other's packages safe. No doorman required.\n\nYour landlord has already verified your address so you're good to go. Click below to activate your account:\n\nActivate My Account: ${HOME_URL}\n\nSee you in the building,\nThe Buzzer Team`
+    return { subject, html, text }
+  }
+  if (type === 'application_received') {
+    const firstName = typeof data.first_name === 'string' ? data.first_name : ''
+    const address = typeof data.address === 'string' ? data.address : ''
+    const unit = typeof data.unit === 'string' ? data.unit : ''
+    const fn = (firstName || 'there').trim()
+    const addr = (address || 'your building').trim()
+    const u = unit.trim()
+    const subject = 'We got your Buzzer application 📦'
+    const html = `<p>Hi ${escapeHtml(fn)},</p>
+<p>Thanks for joining Buzzer — we're glad you're here. We've got your application for ${escapeHtml(addr)}, Unit ${escapeHtml(u)}, and we're looking over your proof of residence now.</p>
+<p>You'll hear from us again within a few hours once you're approved. That next email will include a link that signs you straight into the app.</p>
+<p>If anything's on your mind before then, just hit reply — a real human reads this inbox.</p>
+<p style="margin:28px 0 0">— The Buzzer Team<br/>buzzer.nyc</p>`
+    const text = `Hi ${fn},
+
+Thanks for joining Buzzer — we're glad you're here. We've got your application for ${addr}, Unit ${u}, and we're looking over your proof of residence now.
+
+You'll hear from us again within a few hours once you're approved. That next email will include a link that signs you straight into the app.
+
+If anything's on your mind before then, just hit reply — a real human reads this inbox.
+
+— The Buzzer Team
+buzzer.nyc`
     return { subject, html, text }
   }
   return { error: 'invalid_type' }

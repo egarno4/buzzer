@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { OnboardingChrome } from '../components/OnboardingChrome'
 import { useOnboarding } from '../context/OnboardingContext'
+import { sendApplicationReceivedEmail } from '../lib/sendEmail'
 import { supabase } from '../lib/supabase'
 import './Pending.css'
 
@@ -11,6 +12,7 @@ export default function Pending() {
   const [loading, setLoading] = useState(true)
   const [firstName, setFirstName] = useState('')
   const [email, setEmail] = useState('')
+  const applicationAckInFlight = useRef(false)
 
   useEffect(() => {
     let cancelled = false
@@ -22,10 +24,14 @@ export default function Pending() {
         return
       }
 
+      const userId = sessionData.session.user.id
+
       const { data: profile } = await supabase
         .from('profiles')
-        .select('first_name, proof_file_url, email, status')
-        .eq('id', sessionData.session.user.id)
+        .select(
+          'first_name, proof_file_url, email, status, address, unit, application_received_email_sent_at',
+        )
+        .eq('id', userId)
         .maybeSingle()
 
       if (cancelled) return
@@ -36,6 +42,31 @@ export default function Pending() {
       if (profile.status === 'approved') {
         navigate('/app', { replace: true })
         return
+      }
+
+      if (!profile.application_received_email_sent_at && !applicationAckInFlight.current) {
+        applicationAckInFlight.current = true
+        void (async () => {
+          try {
+            const to = (profile.email || '').trim()
+            if (to) {
+              const result = await sendApplicationReceivedEmail({
+                to,
+                firstName: profile.first_name || '',
+                address: profile.address || '',
+                unit: profile.unit || '',
+              })
+              if (result.ok) {
+                await supabase
+                  .from('profiles')
+                  .update({ application_received_email_sent_at: new Date().toISOString() })
+                  .eq('id', userId)
+              }
+            }
+          } finally {
+            applicationAckInFlight.current = false
+          }
+        })()
       }
 
       setFirstName(profile.first_name || '')

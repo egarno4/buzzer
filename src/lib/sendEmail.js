@@ -85,3 +85,18 @@ export async function sendBuildingInviteEmail({ to, firstName, buildingAddress }
     data: { first_name: firstName, building_address: buildingAddress },
   })
 }
+
+/**
+ * Proof submitted — confirmation while account is pending (logged-in applicant).
+ */
+export async function sendApplicationReceivedEmail({ to, firstName, address, unit }) {
+  return invokeSendEmail({
+    type: 'application_received',
+    to,
+    data: {
+      first_name: firstName,
+      address,
+      unit,
+    },
+  })
+}

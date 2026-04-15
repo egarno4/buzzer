@@ -33,6 +33,8 @@ alter table public.profiles
   add column if not exists email_notifications boolean not null default true;
 alter table public.profiles
   add column if not exists invite_sent boolean not null default false;
+alter table public.profiles
+  add column if not exists application_received_email_sent_at timestamptz;
 
 create policy "Users can insert own profile"
   on public.profiles for insert
