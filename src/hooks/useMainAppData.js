@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import {
   sendHelpRequestedEmail,
@@ -14,6 +14,8 @@ export default function useMainAppData(navigate) {
   const [myPkgs, setMyPkgs] = useState([])
   const [feed, setFeed] = useState([])
   const [approvedNeighbors, setApprovedNeighbors] = useState([])
+  const [ambientOtherNeighborCount, setAmbientOtherNeighborCount] = useState(null)
+  const ambientNeighborSnapshotDoneRef = useRef(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -99,6 +101,11 @@ export default function useMainAppData(navigate) {
         name: (n.first_name || '').trim() || 'Neighbor',
       })),
     )
+
+    if (!ambientNeighborSnapshotDoneRef.current) {
+      ambientNeighborSnapshotDoneRef.current = true
+      setAmbientOtherNeighborCount((neighborRows || []).length)
+    }
 
     const requestIds = (reqRows || []).map((r) => r.id)
     let volunteerMap = {}
@@ -361,6 +368,7 @@ export default function useMainAppData(navigate) {
     myPkgs,
     feed,
     approvedNeighbors,
+    ambientOtherNeighborCount,
     loading,
     error,
     loadAll,

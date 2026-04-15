@@ -23,6 +23,7 @@ export default function MainApp() {
     myPkgs,
     feed,
     approvedNeighbors,
+    ambientOtherNeighborCount,
     loading,
     error,
     loadAll,
@@ -116,6 +117,8 @@ export default function MainApp() {
     { id: 'profile', label: 'Profile', icon: '👤', badge: 0 },
   ], [myActive, feedOpen])
 
+  const otherNeighborCount = ambientOtherNeighborCount ?? approvedNeighbors.length
+
   if (!sessionChecked || loading) return <div style={{ padding: 24 }}>Loading…</div>
   if (!profile) return <div style={{ padding: 24 }}>Profile not found.</div>
 
@@ -127,6 +130,26 @@ export default function MainApp() {
           <div>
             <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.01em', fontFamily: "'Barlow Condensed', sans-serif", textTransform: 'uppercase' }}>BUZZ<span style={{ color: '#D4773A' }}>ER</span></div>
             <div style={{ fontSize: 11, color: '#9C8F7A', marginTop: 1, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{profile.building}</div>
+            <div
+              style={{
+                fontSize: 10,
+                color: '#9C8F7A',
+                marginTop: 5,
+                fontWeight: 500,
+                letterSpacing: '0.01em',
+                lineHeight: 1.35,
+              }}
+            >
+              {otherNeighborCount === 0 ? (
+                <>
+                  You&apos;re the first — <span style={{ color: '#D4773A' }}>invite your neighbors!</span>
+                </>
+              ) : (
+                <>
+                  {otherNeighborCount} {otherNeighborCount === 1 ? 'neighbor' : 'neighbors'} on Buzzer
+                </>
+              )}
+            </div>
           </div>
           {tab !== 'profile' && <div style={{ display: 'flex', gap: 8 }}>
             <button type="button" onClick={() => setModal('log')} style={{ background: '#fff', color: '#D4773A', border: '1.5px solid #D4773A', borderRadius: 20, padding: '8px 13px', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Spotted one</button>
