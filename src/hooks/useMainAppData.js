@@ -161,6 +161,15 @@ export default function useMainAppData(navigate) {
       return false
     }
 
+    const { error: naErr } = await supabase.from('neighbor_actions').insert({
+      actor_id: profile.id,
+      action_type: 'package_spotted',
+      building_address: profile.building,
+    })
+    if (naErr) {
+      console.warn('neighbor_actions package_spotted:', naErr.message)
+    }
+
     const { data: recipient } = await supabase.rpc('neighbor_contact_for_unit', {
       p_building: profile.building,
       p_unit: unit,
@@ -221,6 +230,7 @@ export default function useMainAppData(navigate) {
 
   const volunteerForRequest = useCallback(async (id) => {
     if (!profile) return
+    // Being chosen as holder (package_held) is logged when the requester picks a volunteer (DB trigger on requests).
     // Must match profiles row exactly (RLS: unit + trim(first || ' ' || last)).
     const unit = String(profile.unit).trim()
     const name = String(profile.name).trim()
@@ -254,6 +264,8 @@ export default function useMainAppData(navigate) {
   }, [profile])
 
   const chooseVolunteer = useCallback(async (id, v) => {
+    // package_held neighbor_actions row is inserted by DB trigger trg_requests_neighbor_action_package_held
+    // when status transitions to claimed (see supabase/schema.sql).
     const { error: upErr } = await supabase.from('requests').update({
       status: 'claimed',
       chosen_volunteer_name: v.name,
@@ -350,6 +362,9 @@ export default function useMainAppData(navigate) {
 
     const { error: pkgErr } = await supabase.from('packages').delete().eq('created_by', userId)
     if (pkgErr) return { ok: false, error: pkgErr.message }
+
+    const { error: naErr } = await supabase.from('neighbor_actions').delete().eq('actor_id', userId)
+    if (naErr) return { ok: false, error: naErr.message }
 
     const { error: reqErr } = await supabase.from('requests').delete().eq('created_by', userId)
     if (reqErr) return { ok: false, error: reqErr.message }

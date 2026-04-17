@@ -82,7 +82,29 @@ function EmailToggle({ on, disabled, onToggle }) {
   )
 }
 
-export default function ProfileTab({ user, onSignOut, onUpdateEmailNotifications, onDeleteAccount }) {
+function StatBlock({ label, value, sub, noBorder }) {
+  return (
+    <div style={{ padding: '14px 16px', borderBottom: noBorder ? 'none' : '1px solid #f5f5f5' }}>
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          color: '#999',
+          textTransform: 'uppercase',
+          letterSpacing: '0.08em',
+        }}
+      >
+        {label}
+      </div>
+      <div style={{ fontSize: 18, fontWeight: 800, color: '#1C1812', marginTop: 4 }}>{value}</div>
+      {sub ? (
+        <div style={{ fontSize: 13, color: '#9C8F7A', marginTop: 6, lineHeight: 1.45 }}>{sub}</div>
+      ) : null}
+    </div>
+  )
+}
+
+export default function ProfileTab({ user, neighborProfileStats, onSignOut, onUpdateEmailNotifications, onDeleteAccount }) {
   const [subScreen, setSubScreen] = useState(null)
   const [emailOn, setEmailOn] = useState(true)
   const [savingEmailPref, setSavingEmailPref] = useState(false)
@@ -338,6 +360,50 @@ export default function ProfileTab({ user, onSignOut, onUpdateEmailNotifications
           <span>🏢</span><span>{user.building}</span>
         </div>
       </div>
+      {neighborProfileStats ? (
+        <div
+          style={{
+            background: '#fff',
+            borderRadius: 16,
+            border: '1.5px solid #efefef',
+            overflow: 'hidden',
+            marginBottom: 12,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: "'Barlow Condensed', sans-serif",
+              fontWeight: 800,
+              fontSize: 15,
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase',
+              color: '#1C1812',
+              padding: '14px 16px 0',
+            }}
+          >
+            Helpful Neighbor
+          </div>
+          <p style={{ margin: '6px 16px 10px', fontSize: 12, color: '#9C8F7A' }}>{neighborProfileStats.monthTitle}</p>
+          <StatBlock
+            label="This month"
+            value={
+              neighborProfileStats.loadingLb ? '…' : String(neighborProfileStats.thisMonth)
+            }
+          />
+          <StatBlock
+            label="All time"
+            value={
+              !neighborProfileStats.allTimeResolved ? '…' : String(neighborProfileStats.allTime)
+            }
+          />
+          <StatBlock
+            label="Building rank this month"
+            value={neighborProfileStats.loadingLb ? '…' : neighborProfileStats.buildingRankLine}
+            sub={neighborProfileStats.loadingLb ? '' : neighborProfileStats.motivational}
+            noBorder
+          />
+        </div>
+      ) : null}
       <div style={{ background: '#fff', borderRadius: 16, border: '1.5px solid #efefef', overflow: 'hidden' }}>
         <button
           type="button"

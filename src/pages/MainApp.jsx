@@ -8,6 +8,8 @@ import RequestModal from '../components/mainapp/RequestModal'
 import useMainAppData from '../hooks/useMainAppData'
 import useMainAppRealtime from '../hooks/useMainAppRealtime'
 import WelcomeOnboarding, { hasWelcomeBeenDismissed } from '../components/WelcomeOnboarding'
+import { nycCalendarMonthYear, nycMonthDisplayLabel, ordinalRank, withCompetitionRanks } from '../lib/neighborLeaderboard'
+import { supabase } from '../lib/supabase'
 
 export default function MainApp() {
   const navigate = useNavigate()
@@ -17,6 +19,13 @@ export default function MainApp() {
   const [expandRequestId, setExpandRequestId] = useState(null)
   const [showDismissToast, setShowDismissToast] = useState(false)
   const [showWelcomeOverlay, setShowWelcomeOverlay] = useState(() => !hasWelcomeBeenDismissed())
+  const [leaderboardState, setLeaderboardState] = useState(() => ({
+    loading: false,
+    ranked: [],
+    monthTitle: nycMonthDisplayLabel(),
+    error: null,
+  }))
+  const [neighborAllTime, setNeighborAllTime] = useState(null)
   const {
     sessionChecked,
     profile,
@@ -44,6 +53,113 @@ export default function MainApp() {
     return () => window.clearTimeout(timer)
   }, [showDismissToast])
   useMainAppRealtime({ profile, loadAll })
+
+  useEffect(() => {
+    if (!profile) return
+    if (tab !== 'feed' && tab !== 'profile') return
+    let cancelled = false
+    const { month, year } = nycCalendarMonthYear()
+    setLeaderboardState((s) => ({
+      ...s,
+      loading: true,
+      error: null,
+      monthTitle: nycMonthDisplayLabel(),
+    }))
+    void supabase
+      .rpc('get_building_leaderboard', {
+        p_address: profile.building,
+        p_month: month,
+        p_year: year,
+      })
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error) {
+          setLeaderboardState({
+            loading: false,
+            ranked: [],
+            monthTitle: nycMonthDisplayLabel(),
+            error: error.message,
+          })
+          return
+        }
+        setLeaderboardState({
+          loading: false,
+          ranked: withCompetitionRanks(data),
+          monthTitle: nycMonthDisplayLabel(),
+          error: null,
+        })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [tab, profile])
+
+  useEffect(() => {
+    if (!profile || tab !== 'profile') return
+    let cancelled = false
+    setNeighborAllTime(null)
+    void supabase
+      .from('neighbor_actions')
+      .select('*', { count: 'exact', head: true })
+      .eq('actor_id', profile.id)
+      .then(({ count, error }) => {
+        if (cancelled) return
+        setNeighborAllTime(error ? 0 : count ?? 0)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [tab, profile])
+
+  const neighborProfileStats = useMemo(() => {
+    if (!profile) {
+      return {
+        loadingLb: true,
+        allTimeResolved: false,
+        thisMonth: 0,
+        allTime: 0,
+        buildingRankLine: '—',
+        motivational: '',
+        monthTitle: nycMonthDisplayLabel(),
+      }
+    }
+    const ranked = leaderboardState.ranked
+    const loadingLb = leaderboardState.loading
+    const row = ranked.find((r) => r.actorId === profile.id)
+    const thisMonth = row?.actionCount ?? 0
+    const topCount = ranked.find((r) => r.rank === 1)?.actionCount ?? 0
+    const gap = topCount - thisMonth
+
+    let buildingRankLine = 'No rankings yet'
+    if (!loadingLb) {
+      if (ranked.length === 0) {
+        buildingRankLine = 'No rankings yet'
+      } else if (row) {
+        buildingRankLine = `${ordinalRank(row.rank)} in your building`
+      } else {
+        buildingRankLine = 'Unranked this month'
+      }
+    }
+
+    let motivational = ''
+    if (!loadingLb && ranked.length > 0 && topCount > 0) {
+      if (row && row.rank === 1) {
+        motivational = "You're the most helpful neighbor this month 🏆"
+      } else if (gap > 0) {
+        motivational = `${gap} more to take the lead`
+      }
+    }
+
+    return {
+      loadingLb,
+      allTimeResolved: neighborAllTime !== null,
+      thisMonth,
+      allTime: neighborAllTime ?? 0,
+      buildingRankLine,
+      motivational,
+      monthTitle: leaderboardState.monthTitle,
+    }
+  }, [profile, leaderboardState, neighborAllTime])
 
   const DEEPLINK_KEY = 'buzzer_app_deeplink_v1'
 
@@ -164,15 +280,21 @@ export default function MainApp() {
           <FeedTab
             feed={feed}
             myUnit={profile.unit}
+            myUserId={profile.id}
             expandRequestId={expandRequestId}
             onVolunteer={handleVolunteer}
             onChoose={handleChoose}
             onMarkCollected={handleMarkCollected}
+            leaderboardMonthTitle={leaderboardState.monthTitle}
+            leaderboardRows={leaderboardState.ranked}
+            leaderboardLoading={leaderboardState.loading}
+            leaderboardError={leaderboardState.error}
           />
         )}
         {tab === 'profile' && (
           <ProfileTab
             user={profile}
+            neighborProfileStats={neighborProfileStats}
             onSignOut={signOut}
             onUpdateEmailNotifications={updateEmailNotifications}
             onDeleteAccount={deleteAccount}

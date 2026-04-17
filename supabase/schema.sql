@@ -390,3 +390,106 @@ $$;
 
 revoke all on function public.get_building_neighbor_emails_for_notifications(text) from public;
 grant execute on function public.get_building_neighbor_emails_for_notifications(text) to authenticated;
+
+-- Helpful Neighbor leaderboard: actions in the building (package spotted / package held as volunteer).
+create table if not exists public.neighbor_actions (
+  id uuid primary key default gen_random_uuid(),
+  actor_id uuid references auth.users (id) on delete cascade,
+  action_type text not null,
+  building_address text not null,
+  created_at timestamptz default now(),
+  constraint neighbor_actions_action_type_check
+    check (action_type in ('package_spotted', 'package_held'))
+);
+
+create index if not exists neighbor_actions_building_created_idx
+  on public.neighbor_actions (building_address, created_at desc);
+
+alter table public.neighbor_actions enable row level security;
+
+drop policy if exists "Users can insert own actions" on public.neighbor_actions;
+create policy "Users can insert own actions"
+  on public.neighbor_actions for insert
+  with check (auth.uid() = actor_id);
+
+drop policy if exists "Users can read actions in their building" on public.neighbor_actions;
+create policy "Users can read actions in their building"
+  on public.neighbor_actions for select
+  using (
+    building_address = (
+      select address from public.profiles where id = auth.uid()
+    )
+  );
+
+-- When a request moves to claimed, credit the chosen volunteer (once per request).
+create or replace function public.tg_requests_neighbor_action_package_held()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  vid uuid;
+begin
+  select p.id into vid
+  from public.profiles p
+  where p.address = new.building_address
+    and trim(both from p.unit) = trim(both from new.chosen_volunteer_unit)
+  limit 1;
+
+  if vid is not null then
+    insert into public.neighbor_actions (actor_id, action_type, building_address)
+    values (vid, 'package_held', new.building_address);
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_requests_neighbor_action_package_held on public.requests;
+create trigger trg_requests_neighbor_action_package_held
+  after update on public.requests
+  for each row
+  when (
+    new.status = 'claimed'
+    and old.status is distinct from 'claimed'
+    and new.chosen_volunteer_unit is not null
+  )
+  execute function public.tg_requests_neighbor_action_package_held();
+
+-- Leaderboard for a calendar month in America/New_York (joins profiles; bypasses profile RLS).
+create or replace function public.get_building_leaderboard(p_address text, p_month int, p_year int)
+returns table (actor_id uuid, first_name text, unit text, action_count bigint)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (
+    select 1 from public.profiles me
+    where me.id = auth.uid()
+      and me.status = 'approved'
+      and me.address = p_address
+  ) then
+    return;
+  end if;
+
+  return query
+  select
+    p.id as actor_id,
+    p.first_name,
+    p.unit,
+    count(n.id)::bigint as action_count
+  from public.neighbor_actions n
+  join public.profiles p on p.id = n.actor_id
+  where n.building_address = p_address
+    and extract(year from (n.created_at at time zone 'America/New_York'))::int = p_year
+    and extract(month from (n.created_at at time zone 'America/New_York'))::int = p_month
+  group by p.id, p.first_name, p.unit
+  order by action_count desc, p.first_name asc, p.unit asc;
+end;
+$$;
+
+revoke all on function public.get_building_leaderboard(text, int, int) from public;
+grant execute on function public.get_building_leaderboard(text, int, int) to authenticated;
